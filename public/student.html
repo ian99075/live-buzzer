@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>學生搶答 · 課堂搶答</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/css/app.css"><script type="module" src="/js/student.js"></script></head>
+<body class="student-page">
+<header class="topbar"><a class="brand" href="/student"><span class="brand-mark">答</span><span>課堂搶答<span class="brand-caption">CLASSROOM LIVE</span></span></a><span id="connection" class="connection">尚未登入</span></header>
+<main class="student-main">
+  <section id="login-view" class="student-login"><p class="eyebrow">YOUR IDEAS MATTER</p><h1>準備好，<br>說出你的想法。</h1><p class="muted">輸入學號，加入這堂課的即時搶答。</p><form id="login-form" class="panel"><label for="student-number">學號</label><input id="student-number" name="studentNumber" type="text" autocomplete="off" spellcheck="false" placeholder="請輸入完整學號" required><button class="primary full" type="submit">進入系統 <span aria-hidden="true">→</span></button><p id="login-message" class="message" role="status"></p></form><p class="footnote">請確認學號正確，前面的 0 也要保留。</p></section>
+  <section id="classroom" hidden><div class="student-heading"><div><p class="eyebrow">STUDENT SPACE</p><h1>準備作答</h1></div><div class="identity"><span id="identity"></span><button id="switch-student" class="text-button">切換學號</button></div></div><p class="muted student-hint">先填寫回答，再按下「搶答！」。每題只會保存首次有效送出的回答。</p><div id="waiting" class="panel empty-state"><span class="waiting-orbit" aria-hidden="true">✳</span><h2>等待老師發布題目...</h2><p>保持這個畫面，開放後就能開始作答。</p></div><div id="answer-list" class="answer-list"></div></section>
+</main>
+</body></html>

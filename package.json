@@ -1,0 +1,14 @@
+{
+  "name": "classroom-live-buzzer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "test": "node --test tests/*.test.js",
+    "preview:test": "node tests/preview.js"
+  },
+  "dependencies": { "google-auth-library": "^10.0.0" }
+}

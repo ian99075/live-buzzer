@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>教師控制台 · 版型提案 A</title><link rel="icon" href="../mark.svg"><link rel="stylesheet" href="teacher-layout.css"><script type="module" src="teacher-layout.js"></script></head>
+<body>
+  <div class="preview-note"><span><strong>版型提案 A</strong>　模擬資料・操作不會影響正式課堂或 Google Sheet</span><a href="/teacher" target="_blank" rel="noopener">開啟原版比較 ↗</a></div>
+  <header class="topbar"><a class="brand" href="teacher-layout.html"><span class="brand-mark">答</span><span>課堂搶答<small>CLASSROOM LIVE</small></span></a><span class="session-label">教師工作區 <span class="avatar">師</span></span></header>
+  <main>
+    <section class="page-heading"><div><p class="eyebrow">TEACHER DASHBOARD</p><h1>把焦點，留給每個回答。</h1><p class="muted">左側掌握題目進度，右側查看同學的想法。</p></div><div class="summary" aria-label="課堂摘要"><div><strong id="open-count">2</strong><span>題開放中</span></div><div><strong id="answer-count">9</strong><span>份回答</span></div><div><strong id="winner-count">3</strong><span>題可匯出</span></div></div></section>
+    <section class="workspace-toolbar" aria-label="檢視與匯出"><div class="view-controls"><span class="toolbar-label">閱讀間距</span><div class="segmented"><button id="comfortable" aria-pressed="true">舒適</button><button id="compact" aria-pressed="false">精簡</button></div><button id="focus" class="quiet" aria-pressed="false">收合題目欄</button></div><button id="export" class="accent">彙整至 Google Sheet <span aria-hidden="true">↗</span></button></section>
+    <div class="workspace">
+      <aside class="sidebar panel" aria-label="題目管理"><div class="panel-title"><div><span class="overline">01 / QUESTIONS</span><h2>題目管理</h2></div><span id="question-count" class="count">4 / 6</span></div><button id="add-toggle" class="add-button" aria-expanded="false" aria-controls="add-form">＋ 新增題目</button>
+        <form id="add-form" hidden><label for="new-content">題目內容</label><textarea id="new-content" rows="3" required placeholder="輸入新題目…"></textarea><button class="primary" type="submit">新增到預覽</button></form>
+        <nav id="question-nav" aria-label="選擇要查看的題目"></nav><p class="sidebar-note">可同時開放多題。<br>選取題目即可查看完整回答。</p>
+      </aside>
+      <section class="monitor" aria-label="即時回答"><div class="monitor-heading"><div><span class="overline">02 / RESPONSES</span><h2 id="view-heading">即時回答</h2></div><span class="simulation"><i></i>模擬課堂</span></div><div id="content"></div></section>
+    </div>
+    <footer><span>匯出僅包含各題第一名，格式為「回答_學號」。</span><span>版型預覽 · 重新整理即可重設</span></footer>
+  </main>
+  <dialog id="export-dialog"><div class="dialog-top"><span class="overline">EXPORT PREVIEW</span><button id="close-export" class="quiet" aria-label="關閉匯出預覽">✕</button></div><h2>這次會彙整哪些回答？</h2><p class="muted">以下為模擬預覽，不會連線或寫入 Google Sheet。</p><div id="export-items"></div><p class="export-note">正式套用時，會覆寫「工作表1」中相應的 Sequence；沒有第一名的格保持原樣。</p><button id="done-export" class="primary full">了解，返回預覽</button></dialog>
+  <p id="notice" class="notice" role="status" hidden></p>
+</body></html>

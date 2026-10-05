@@ -1,0 +1,41 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { fixture } from './helpers.js';
+
+test('OpenAPI 路由完整、參照有效、瀏覽器資源可讀且私人資料不可讀', async t => {
+  const spec = JSON.parse(await readFile(new URL('../docs/openapi.json', import.meta.url), 'utf8'));
+  assert.equal(spec.openapi, '3.1.0');
+  function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.$ref) { const parts = node.$ref.split('/').slice(1); assert.ok(parts.reduce((obj, key) => obj?.[key], spec), node.$ref); }
+    for (const value of Object.values(node)) walk(value);
+  }
+  walk(spec);
+  const expected = [
+    'POST /api/teacher/session', 'POST /api/student/session', 'GET /api/teacher/questions', 'POST /api/teacher/questions',
+    'GET /api/teacher/questions/{questionId}', 'PATCH /api/teacher/questions/{questionId}', 'DELETE /api/teacher/questions/{questionId}',
+    'POST /api/teacher/questions/{questionId}/start', 'POST /api/teacher/questions/{questionId}/stop',
+    'GET /api/student/questions', 'POST /api/student/questions/{questionId}/buzz', 'POST /api/teacher/exports/google-sheet',
+    'GET /api/teacher/events', 'GET /api/student/events',
+  ];
+  assert.deepEqual(Object.entries(spec.paths).flatMap(([path, ops]) => Object.keys(ops).map(method => `${method.toUpperCase()} ${path}`)).sort(), expected.sort());
+  const f = await fixture(t);
+  for (const path of ['/teacher', '/student', '/css/app.css', '/js/teacher.js', '/js/student.js', '/mark.svg']) {
+    const result = await fetch(f.base + path); assert.equal(result.status, 200, path);
+    assert.equal(result.headers.get('cache-control'), 'no-store');
+  }
+  for (const path of ['/docs/openapi.json', '/tests/preview.js', '/src/config.js', '/.env', '/%2e%2e%2fsrc/config.js']) assert.equal((await fetch(f.base + path)).status, 404, path);
+});
+
+test('新 HTTP 服務不恢復舊題目或工作階段', async t => {
+  const first = await fixture(t); const teacher = await first.login('teacher'); const student = await first.login();
+  const q = await first.question(teacher);
+  await first.request(`/api/student/questions/${q.id}/buzz`, { method: 'POST', cookie: student, body: { answer: '暫存' } });
+  await first.close();
+  const fresh = await fixture(t);
+  assert.equal((await fresh.request('/api/teacher/questions', { cookie: teacher })).status, 401);
+  assert.equal((await fresh.request('/api/student/questions', { cookie: student })).status, 401);
+  const newTeacher = await fresh.login('teacher');
+  assert.deepEqual((await fresh.request('/api/teacher/questions', { cookie: newTeacher })).data.questions, []);
+});

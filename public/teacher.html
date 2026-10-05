@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>教師控制台 · 課堂搶答</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/teacher-dashboard.css"><script type="module" src="/js/teacher.js"></script></head>
+<body class="teacher-page"><header class="topbar"><a class="brand" href="/teacher"><span class="brand-mark">答</span><span>課堂搶答<small>CLASSROOM LIVE</small></span></a><div class="top-actions"><span id="connection" class="connection">尚未登入</span><a class="text-link" href="/student" target="_blank" rel="noopener">開啟學生端 ↗</a></div></header>
+<main>
+  <section id="login-view" class="login-layout">
+    <div class="login-intro"><p class="eyebrow">TEACHER SPACE</p><h1>讓每個回答，<br>即時被看見。</h1><p>掌握課堂節奏，收集每一份想法。<br>從出題、搶答到課堂紀錄，在這裡完成。</p><div class="intro-note"><span class="live-dot"></span>多題同步開放 · 回答即時更新</div></div>
+    <form id="login-form" class="panel login-panel"><p class="eyebrow">教師登入</p><h2>準備開始一堂好課</h2><label for="username">教師帳號</label><input id="username" name="username" autocomplete="username" required><label for="password">密碼</label><input id="password" name="password" type="password" autocomplete="current-password" required><button class="primary" type="submit">登入控制台 <span aria-hidden="true">→</span></button><p id="login-message" class="message" role="status"></p></form>
+  </section>
+
+<div id="dashboard" class="dashboard" hidden>
+<section class="page-heading"><div><p class="eyebrow">TEACHER DASHBOARD</p><h1>把焦點，留給每個回答。</h1><p class="muted">左側掌握題目進度，右側查看同學的想法。</p></div><div class="summary" aria-label="課堂摘要"><div><strong id="open-count">0</strong><span>題開放中</span></div><div><strong id="answer-count">0</strong><span>份回答</span></div><div><strong id="winner-count">0</strong><span>題可匯出</span></div></div></section>
+<p id="test-banner" class="test-banner" hidden>測試預覽：匯出使用模擬服務，不會寫入 Google Sheet。</p><p id="dashboard-message" class="message" role="status"></p>
+<section class="workspace-toolbar" aria-label="檢視與匯出"><div class="view-controls"><span class="toolbar-label">閱讀間距</span><div class="segmented"><button id="comfortable" aria-pressed="true">舒適</button><button id="compact" aria-pressed="false">精簡</button></div><button id="focus" class="quiet" aria-pressed="false">收合題目欄</button></div><button id="export-button" class="accent">彙整至 Google Sheet ↗</button></section>
+<p id="export-message" class="message export-result" role="status"></p>
+<div class="workspace"><aside class="sidebar panel" aria-label="題目管理"><div class="panel-title"><div><span class="overline">01 / QUESTIONS</span><h2>題目管理</h2></div><span id="question-count" class="count">0 / 6</span></div><button id="add-toggle" class="add-button" aria-expanded="false" aria-controls="add-question">＋ 新增題目</button>
+<form id="add-question" hidden><fieldset id="add-fields"><label for="case-number">題目編號</label><select id="case-number" name="caseNumber"></select><label for="question-content">題目內容</label><textarea id="question-content" name="content" rows="3" placeholder="這一題，想問同學什麼？" required></textarea><button class="primary full" type="submit">新增題目</button></fieldset><p id="add-message" class="message" role="status"></p></form>
+<nav id="question-nav" aria-label="選擇要查看的題目"></nav><p id="question-empty" class="empty-small">還沒有題目，先新增 Case 1 吧。</p><p class="sidebar-note">可同時開放多題。<br>選取題目即可管理並查看完整回答。</p></aside>
+<section class="monitor" aria-label="即時回答"><div class="monitor-heading"><div><span class="overline">02 / RESPONSES</span><h2 id="view-heading">各題回答總覽</h2></div><button id="show-all" class="quiet" hidden>← 全部題目</button></div><div id="overview-list"></div><article id="detail-view" class="panel detail" hidden><div id="selected-controls"></div><div id="response-list"></div></article><div id="response-empty" class="panel empty-state"><span class="empty-icon" aria-hidden="true">✳</span><h3>等待課堂的第一個想法</h3><p>新增並開放題目後，同學的回答將即時出現。</p></div></section></div>
+<footer><span>課堂資料僅暫存於記憶體；重啟服務後會清空。</span><span>匯出僅包含各題第一名，格式為「回答_學號」。</span></footer>
+</div></main>
+<dialog id="export-dialog"><div class="dialog-top"><span class="overline">EXPORT TO GOOGLE SHEET</span><button id="close-export" class="quiet" aria-label="關閉匯出清單">✕</button></div><h2>確認彙整課堂回答</h2><p id="sheet-target" class="muted"></p><div id="export-items"></div><p class="export-note">會覆寫下列 Sequence；沒有第一名的格保持原樣。清單會隨回答更新，實際以按下確認後伺服器收到的第一名快照為準。</p><div class="dialog-actions"><button id="cancel-export" class="quiet">取消</button><button id="confirm-export" class="primary">確認匯出</button></div></dialog>
+</body></html>
