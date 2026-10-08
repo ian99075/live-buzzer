@@ -15,6 +15,7 @@ const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 export function createApp({ config, store = new Classroom(), sessions = new Sessions(config), writer, heartbeatMs } = {}) {
   const events = new Events(store, sessions, config, heartbeatMs);
+  store.setOnChange(() => events.publish());
   const exporter = new SheetExporter(store, config, writer || createGoogleWriter(config), () => events.teachers());
   const server = createServer(async (req, res) => {
     headers(res);
@@ -22,6 +23,7 @@ export function createApp({ config, store = new Classroom(), sessions = new Sess
       const path = new URL(req.url, 'http://localhost').pathname;
       if (path.startsWith('/api/')) {
         const body = ['POST', 'PATCH', 'DELETE'].includes(req.method) ? await bodyJson(req, config) : undefined;
+        store.settleDue();
         const ctx = { req, res, path, body, store, sessions, events, exporter, config };
         if (path.startsWith('/api/teacher/')) { await teacherRoute(ctx); return; }
         if (path.startsWith('/api/student/')) { studentRoute(ctx); return; }
@@ -45,7 +47,7 @@ export function createApp({ config, store = new Classroom(), sessions = new Sess
   });
   server.requestTimeout = 15000; server.headersTimeout = 10000;
   const close = async () => {
-    events.close(); server.closeAllConnections();
+    store.close(); events.close(); server.closeAllConnections();
     if (server.listening) await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve()));
   };
   return { server, store, sessions, events, exporter, close };

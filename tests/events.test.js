@@ -11,7 +11,7 @@ test('SSE 教師全部回答、學生隔離、重連、過期與清理', { timeo
   t.after(async () => { await Promise.all([ts.close(), as.close(), bs.close()]); });
   await Promise.all([ts.next(), as.next(), bs.next()]);
   await f.request(`/api/student/questions/${q.id}/buzz`, { method: 'POST', cookie: a, body: { answer: '甲答案' } });
-  assert.equal((await ts.next()).data.questions[0].winner.answer, '甲答案');
+  assert.equal((await ts.next()).data.questions[0].provisionalLeader.answer, '甲答案');
   const own = await as.next(); assert.equal(own.data.questions[0].submitted, true); assert.equal(own.raw.includes('winner'), false);
   await delay(50); assert.equal(bs.frames.length, 0);
   await f.request(`/api/student/questions/${q.id}/buzz`, { method: 'POST', cookie: b, body: { answer: '乙答案' } });

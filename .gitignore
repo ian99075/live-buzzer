@@ -6,3 +6,5 @@ credentials/
 *service-account*.json
 *.log
 coverage/
+.presentation-build/
+deliverables/~$*.pptx

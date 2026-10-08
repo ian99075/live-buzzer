@@ -29,10 +29,11 @@ export class Events {
   send(c) {
     if (!this.valid(c)) return;
     if (c.blocked) { c.dirty = true; return; }
-    const data = JSON.stringify(c.role === 'teacher' ? teacherSnapshot(this.store, this.config)
-      : studentSnapshot(this.store, c.session.studentNumber));
-    if (data === c.last) return;
-    c.last = data; this.write(c, `event: snapshot\ndata: ${data}\n\n`);
+    const value = c.role === 'teacher' ? teacherSnapshot(this.store, this.config)
+      : studentSnapshot(this.store, c.session.studentNumber);
+    const stable = JSON.stringify({ ...value, serverNow: undefined });
+    if (stable === c.last) return;
+    c.last = stable; this.write(c, `event: snapshot\ndata: ${JSON.stringify(value)}\n\n`);
   }
   publish(studentNumber = null) {
     for (const c of this.clients) {

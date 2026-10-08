@@ -3,7 +3,7 @@ import { HttpError } from './http.js';
 export function sheetData(winners, sheetName) {
   const sheet = `'${sheetName.replaceAll("'", "''")}'`;
   return winners.map(w => ({ range: `${sheet}!C${18 + w.caseNumber}`,
-    values: [[`${w.answer}_${w.studentNumber}`]] }));
+    values: [[w.clear ? '' : `${w.answer}_${w.studentNumber}`]] }));
 }
 
 export function createGoogleWriter(config, { fetchImpl = fetch, tokenProvider } = {}) {
@@ -45,12 +45,22 @@ export class SheetExporter {
   constructor(store, config, writer, onChange = () => {}) { Object.assign(this, { store, config, writer, onChange }); }
   async run() {
     this.store.unlocked();
+    this.store.settleDue();
     this.store.exporting = true;
-    const data = sheetData(this.store.winners(), this.config.sheetName);
+    const targets = this.store.all().filter(q => q.status === 'settled').flatMap(q => {
+      if (q.winnerKey !== null) {
+        const winner = q.submissions.get(q.winnerKey);
+        return [{ question: q, caseNumber: q.caseNumber, studentNumber: winner.studentNumber, answer: winner.answer }];
+      }
+      return q.confirmedExport ? [{ question: q, caseNumber: q.caseNumber, clear: true }] : [];
+    });
+    const data = sheetData(targets, this.config.sheetName);
     this.onChange();
     try {
       if (data.length) await this.writer(data);
-      return { writtenCount: data.length, ranges: data.map(d => d.range), testMode: this.config.testMode === true };
+      for (const target of targets) target.question.confirmedExport = !target.clear;
+      return { writtenCount: data.length, clearedCount: targets.filter(target => target.clear).length,
+        ranges: data.map(d => d.range), testMode: this.config.testMode === true };
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(502, '未能確認寫入成功，請稍後重試。');

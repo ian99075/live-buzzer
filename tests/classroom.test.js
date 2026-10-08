@@ -20,7 +20,7 @@ test('設定、登入與工作階段只在記憶體中', () => {
   now = 11; assert.equal(auth.find(token, 'student'), null);
 });
 
-test('多題獨立、全部回答、去重、重開與刪除重建', () => {
+test('多題獨立、全部回答、去重、結算鎖定與刪除重建', () => {
   const s = new Classroom(); const a = s.add(1, '題目一'); const b = s.add(2, '題目二');
   assert.throws(() => s.add(1, '重複'), { status: 409 });
   assert.throws(() => s.add(7, '超過'), { status: 400 });
@@ -31,14 +31,15 @@ test('多題獨立、全部回答、去重、重開與刪除重建', () => {
   assert.equal(s.submit(a.id, '002', '乙'), true);
   assert.equal(s.submit(a.id, '001', '改答案'), false);
   s.submit(b.id, '002', '第二題答案');
-  assert.equal(a.winnerKey, '001'); assert.equal(b.winnerKey, '002');
+  assert.equal(s.ranking(a)[0].id, a.submissions.get('001').id); assert.equal(b.winnerKey, null);
   assert.equal(a.submissions.size, 2); assert.equal(a.submissions.get('001').answer, '甲');
-  s.status(a.id, 'stopped'); assert.equal(s.submit(a.id, '003', '晚到'), false);
-  assert.equal(b.status, 'open'); s.status(a.id, 'open'); s.submit(a.id, '003', '重開後');
-  assert.equal(a.winnerKey, '001'); assert.equal(a.submissions.size, 3);
-  s.edit(a.id, '修正文字'); assert.equal(a.submissions.size, 3);
+  s.status(a.id, 'settled'); assert.equal(s.submit(a.id, '003', '晚到'), false);
+  assert.equal(b.status, 'open'); assert.throws(() => s.status(a.id, 'open'), { status: 409 });
+  assert.equal(a.winnerKey, '001'); assert.equal(a.submissions.size, 2);
+  s.edit(a.id, '修正文字'); assert.equal(a.submissions.size, 2);
   s.remove(a.id); const replacement = s.add(1, '新題'); s.status(replacement.id, 'open');
   assert.notEqual(replacement.id, a.id); assert.equal(s.submit(a.id, '004', '舊請求'), false);
   assert.equal(replacement.submissions.size, 0); assert.equal(s.get(b.id).caseNumber, 2);
   assert.deepEqual(new Classroom().all(), []);
+  s.close();
 });

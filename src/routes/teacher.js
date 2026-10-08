@@ -19,23 +19,30 @@ export async function teacherRoute(ctx) {
   if (path === '/api/teacher/questions') {
     if (req.method === 'GET') { json(res, 200, teacherSnapshot(store, config)); return; }
     if (req.method === 'POST') {
-      fields(body, ['caseNumber', 'content']);
-      const q = store.add(body.caseNumber, body.content);
-      json(res, 201, teacherQuestion(q)); events.publish(); return;
+      fields(body, ['caseNumber', 'content', 'durationSeconds'], ['caseNumber', 'content']);
+      const q = store.add(body.caseNumber, body.content, body.durationSeconds);
+      json(res, 201, teacherQuestion(q, store)); events.publish(); return;
     }
   }
-  const match = path.match(/^\/api\/teacher\/questions\/([a-zA-Z0-9-]+)(?:\/(start|stop))?$/);
+  const disqualify = path.match(/^\/api\/teacher\/questions\/([a-zA-Z0-9-]+)\/submissions\/([a-zA-Z0-9-]+)\/disqualify$/);
+  if (disqualify && req.method === 'POST') {
+    fields(body, []); json(res, 200, teacherQuestion(store.disqualify(disqualify[1], disqualify[2]), store));
+    events.publish(); return;
+  }
+  const match = path.match(/^\/api\/teacher\/questions\/([a-zA-Z0-9-]+)(?:\/(start|pause|resume|stop))?$/);
   if (match) {
     const [, id, action] = match;
-    if (!action && req.method === 'GET') { json(res, 200, teacherQuestion(store.get(id))); return; }
+    if (!action && req.method === 'GET') { json(res, 200, teacherQuestion(store.get(id), store)); return; }
     if (!action && req.method === 'PATCH') {
-      fields(body, ['content']); json(res, 200, teacherQuestion(store.edit(id, body.content))); events.publish(); return;
+      fields(body, ['content', 'durationSeconds'], ['content']); json(res, 200, teacherQuestion(store.edit(id, body.content, body.durationSeconds), store)); events.publish(); return;
     }
     if (!action && req.method === 'DELETE') {
       fields(body, []); store.remove(id); json(res, 204); events.publish(); return;
     }
     if (action && req.method === 'POST') {
-      fields(body, []); json(res, 200, teacherQuestion(store.status(id, action === 'start' ? 'open' : 'stopped')));
+      fields(body, []);
+      const state = { start: 'open', pause: 'paused', resume: 'open', stop: 'settled' }[action];
+      json(res, 200, teacherQuestion(store.status(id, state), store));
       events.publish(); return;
     }
   }

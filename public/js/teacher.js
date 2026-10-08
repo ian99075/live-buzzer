@@ -8,10 +8,19 @@ const $ = selector => document.querySelector(selector);
 const controls = new Map(), navigation = new Map();
 let snapshot = { questions: [], exporting: false }, closeEvents, selectedId = null;
 let localLock = false, adding = false, loggedIn = false;
+let clockOffset = 0;
 const allButton = element('button', 'nav-button nav-all', '全部題目'); allButton.type = 'button';
 const allCount = element('span', 'count'); allButton.append(allCount);
 allButton.onclick = () => choose(null);
-function choose(id) { selectedId = id; renderManagement(); renderAnswers(); }
+function choose(id) { selectedId = id; renderManagement(); renderAnswers(); tick(); }
+function tick() {
+  for (const timer of document.querySelectorAll('[data-deadline-at]')) {
+    const end = Number(timer.dataset.deadlineAt);
+    const seconds = Math.ceil(Math.max(0, end - (Date.now() - clockOffset)) / 1000);
+    timer.textContent = `剩餘 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  }
+}
+setInterval(tick, 250);
 function loginView(text = '') {
   loggedIn = false; closeEvents?.(); closeEvents = undefined;
   exportUI.reset(); $('#dashboard').hidden = true; $('#login-view').hidden = false; connection(false, '尚未登入');
@@ -58,7 +67,7 @@ function renderAnswers() {
     // SSE 只更新回答；所選題目未變時，不重新掛載編輯表單，保留輸入焦點與游標。
     const root = controls.get(q.id).root;
     if ($('#selected-controls').firstChild !== root) $('#selected-controls').replaceChildren(root);
-    renderDetailResponses($('#response-list'), q);
+    renderDetailResponses($('#response-list'), q, { updated: refresh, failed, locked: localLock || snapshot.exporting });
   } else {
     $('#selected-controls').replaceChildren();
     $('#response-list').replaceChildren();
@@ -67,7 +76,7 @@ function renderAnswers() {
 }
 function apply(value) {
   if (!loggedIn) return;
-  snapshot = value; renderManagement(); renderAnswers(); exportUI.update(value);
+  snapshot = value; clockOffset = Date.now() - value.serverNow; renderManagement(); renderAnswers(); exportUI.update(value); tick();
   $('#open-count').textContent = value.questions.filter(q => q.status === 'open').length;
   $('#answer-count').textContent = value.questions.reduce((n,q) => n+q.submissions.length, 0);
   $('#winner-count').textContent = value.questions.filter(q => q.winner).length;
@@ -98,10 +107,12 @@ $('#add-toggle').onclick = () => { const open = $('#add-question').hidden; $('#a
 $('#add-question').onsubmit = async event => {
   event.preventDefault(); if (adding || localLock || snapshot.exporting) return;
   if (!validText($('#question-content').value,2000)) { message($('#add-message'),'請填寫 1–2000 字的題目。',true); return; }
+  const durationSeconds = Number($('#duration-seconds').value);
+  if (!Number.isInteger(durationSeconds) || durationSeconds < 1 || durationSeconds > 3600) { message($('#add-message'),'搶答時間需為 1–3600 秒。',true); return; }
   adding = true; renderManagement(); message($('#add-message'));
   try {
-    const q = await api('/api/teacher/questions',{method:'POST',body:{caseNumber:Number($('#case-number').value),content:$('#question-content').value}});
-    selectedId = q.id; $('#question-content').value = ''; $('#add-question').hidden = true; $('#add-toggle').setAttribute('aria-expanded','false'); await refresh();
+    const q = await api('/api/teacher/questions',{method:'POST',body:{caseNumber:Number($('#case-number').value),content:$('#question-content').value,durationSeconds}});
+    selectedId = q.id; $('#question-content').value = ''; $('#duration-seconds').value = '60'; $('#add-question').hidden = true; $('#add-toggle').setAttribute('aria-expanded','false'); await refresh();
   } catch (error) { message($('#add-message'),error.message,true); failed(error); }
   finally { adding = false; renderManagement(); }
 };

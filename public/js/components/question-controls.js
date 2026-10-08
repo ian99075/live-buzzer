@@ -1,7 +1,7 @@
 import { api, element, message } from '../api.js';
 import { questionEditor } from './question-editor.js';
 
-export const stateLabel = state => ({ draft: '尚未開放', open: '開放中', stopped: '已停止' })[state];
+export const stateLabel = state => ({ draft: '尚未開放', open: '搶答中', paused: '已暫停', settled: '已結算' })[state];
 export function confirmDelete(caseNumber) {
   return new Promise(resolve => {
     const dialog = element('dialog');
@@ -19,13 +19,20 @@ export function questionControls(initial, callbacks) {
   const top = element('div', 'question-top'); const tag = element('span', 'case-tag', `CASE ${q.caseNumber}`);
   const state = element('span', 'status-tag'); top.append(tag, state);
   const content = element('p', 'question-text'); const actions = element('div', 'control-actions');
-  const toggle = element('button', 'primary'); const edit = element('button', '', '編輯'); const remove = element('button', 'danger', '刪除');
+  const timer = element('strong', 'question-timer');
+  const toggle = element('button', 'primary'); const pause = element('button', '', '暫停'); const stop = element('button', '', '提早結算');
+  const edit = element('button', '', '編輯'); const remove = element('button', 'danger', '刪除');
   const feedback = element('p', 'message'); feedback.setAttribute('role', 'status');
   const editor = questionEditor(q, callbacks);
   function render() {
     content.textContent = q.content; state.textContent = stateLabel(q.status); state.dataset.state = q.status;
-    toggle.textContent = q.status === 'open' ? '停止搶答' : '開始搶答';
-    for (const button of [toggle, edit, remove]) button.disabled = locked || busy;
+    toggle.textContent = q.status === 'paused' ? '繼續搶答' : '開始搶答';
+    toggle.hidden = !['draft','paused'].includes(q.status); pause.hidden = q.status !== 'open';
+    stop.hidden = !['open','paused'].includes(q.status);
+    timer.dataset.deadlineAt = q.status === 'open' ? q.deadlineAt : '';
+    timer.textContent = q.status === 'open' ? '' : q.status === 'settled' ? '倒數結束' : `設定 ${q.status === 'draft' ? q.durationSeconds : Math.ceil(q.remainingMs / 1000)} 秒`;
+    if (q.status !== 'open') delete timer.dataset.deadlineAt;
+    for (const button of [toggle, pause, stop, edit, remove]) button.disabled = locked || busy;
     editor.lock(locked || busy);
   }
   async function run(path, method = 'POST') {
@@ -34,9 +41,11 @@ export function questionControls(initial, callbacks) {
     catch (error) { message(feedback, error.message, true); callbacks.failed(error); }
     finally { busy = false; render(); }
   }
-  toggle.onclick = () => run(`/api/teacher/questions/${q.id}/${q.status === 'open' ? 'stop' : 'start'}`);
-  edit.onclick = () => editor.open(q.content);
+  toggle.onclick = () => run(`/api/teacher/questions/${q.id}/${q.status === 'paused' ? 'resume' : 'start'}`);
+  pause.onclick = () => run(`/api/teacher/questions/${q.id}/pause`);
+  stop.onclick = () => run(`/api/teacher/questions/${q.id}/stop`);
+  edit.onclick = () => editor.open(q);
   remove.onclick = async () => { if (await confirmDelete(q.caseNumber)) await run(`/api/teacher/questions/${q.id}`, 'DELETE'); };
-  actions.append(toggle, edit, remove); root.append(top, content, actions, editor.form, feedback); render();
+  actions.append(toggle, pause, stop, edit, remove); root.append(top, content, timer, actions, editor.form, feedback); render();
   return { root, update(value, exportLock) { q = value; locked = exportLock; render(); } };
 }

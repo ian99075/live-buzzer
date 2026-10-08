@@ -1,6 +1,14 @@
 # 接續紀錄
 
-更新：2026-09-24。live-buzzer 已完成全部既定實作與 OpenSpec 收尾，無因額度中斷而尚待完成的項目。
+更新：2026-10-08。原始 `live-buzzer` 已完成全部既定實作與 OpenSpec 收尾；以下「完成狀態」以下段落保留該輪歷史紀錄。
+
+## 新 change：timed-priority-buzz
+
+已依 Proposal／Design／Delta Specs 實作每題倒數、暫停／繼續／結算、即時優先順位、教師取消資格與候補、學生確認彈窗，以及已結算得標者的覆寫／全員失格清空。無資料庫；只在單一 Node.js 程序記憶體中保存課堂與已確認匯出狀態。`docs/openapi.json` 與產生腳本已同步。
+
+2026-10-08 完整 `npm test` 26/26 通過；模擬 Chrome 瀏覽器驗收多題倒數、確認／取消／逾時／重試、A／B／C 順位變動、結算／失格、覆寫／只剩清空格的匯出、教師編輯焦點保留及 390 px 寬度。詳細證據見 `docs/verification.md`。本輪沒有再次寫入真實 Google Sheet，也沒有讀取或修改 `.env` 與服務帳號憑證。
+
+OpenSpec `timed-priority-buzz` 的 **Verify 已通過**，報告見 `docs/timed-priority-buzz-verification.md`；17 項 Apply 任務已完成。三份差異規格已同步至 `openspec/specs/` 主規格，change 已封存於 `openspec/changes/archive/2026-10-08-timed-priority-buzz/`。若要做新功能再另開 change。
 
 ## 完成狀態
 
