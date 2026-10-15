@@ -7,7 +7,8 @@ const cards = new Map(); let closeEvents, online = false, generation = 0, clockO
 setInterval(() => { for (const card of cards.values()) card.tick(); }, 250);
 function loginView(text = '') {
   generation++; closeEvents?.(); closeEvents = undefined; online = false; snapshot = { questions: [] };
-  for (const card of cards.values()) card.destroy(); cards.clear(); $('#answer-list').replaceChildren(); $('#identity').textContent = '';
+  for (const card of cards.values()) card.destroy(); cards.clear(); $('#answer-list').replaceChildren();
+  $('#identity-number').textContent = ''; $('#identity-group').textContent = '';
   $('#classroom').hidden = true; $('#login-view').hidden = false; connection(false, '尚未登入');
   message($('#login-message'), text, !!text);
 }
@@ -25,7 +26,11 @@ function render() {
   });
   $('#waiting').hidden = snapshot.questions.length > 0;
 }
-function apply(value) { snapshot = value; clockOffset = Date.now() - value.serverNow; $('#identity').textContent = `學號 ${value.studentNumber}`; render(); }
+function apply(value) {
+  snapshot = value; clockOffset = Date.now() - value.serverNow;
+  $('#identity-number').textContent = `學號 ${value.studentNumber}`;
+  $('#identity-group').textContent = `G${value.groupNumber}`; render();
+}
 function enter(value) {
   closeEvents?.(); generation++; for (const card of cards.values()) card.destroy(); cards.clear(); $('#answer-list').replaceChildren(); online = false;
   $('#login-view').hidden = true; $('#classroom').hidden = false; apply(value); connection(false, '連線中…');
@@ -37,8 +42,13 @@ $('#switch-student').onclick = () => { loginView(); $('#student-number').focus()
 $('#login-form').onsubmit = async event => {
   event.preventDefault();
   if (!validText($('#student-number').value, 80)) { message($('#login-message'), '請輸入 1–80 字的學號。', true); return; }
+  const groupInput = $('#group-number').value.trim();
+  const groupNumber = Number(groupInput);
+  if (!/^[0-9]+$/.test(groupInput) || !Number.isSafeInteger(groupNumber) || groupNumber < 1) {
+    message($('#login-message'), '請輸入正整數組別編號，例如 2。', true); return;
+  }
   const button = event.currentTarget.querySelector('button'); button.disabled = true; message($('#login-message'));
-  try { await api('/api/student/session', { method: 'POST', body: { studentNumber: $('#student-number').value } }); enter(await api('/api/student/questions')); }
+  try { await api('/api/student/session', { method: 'POST', body: { studentNumber: $('#student-number').value, groupNumber } }); enter(await api('/api/student/questions')); }
   catch (error) { message($('#login-message'), error.message, true); }
   finally { button.disabled = false; }
 };

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>教師端題組版型預覽 · 課堂搶答</title>
+  <link rel="icon" href="../mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="grouped-teacher-layout.css">
+  <script type="module" src="grouped-teacher-layout.js"></script>
+</head>
+<body>
+  <div class="preview-bar"><strong>版型預覽 B</strong><span>以下皆為模擬資料，操作不會影響正式課堂或 Google Sheet。</span><a href="/teacher" target="_blank" rel="noopener">返回正式教師端 ↗</a></div>
+  <header class="topbar"><div class="brand"><span class="brand-mark">答</span><span>課堂搶答<small>CLASSROOM LIVE</small></span></div><span class="session-label">教師工作區 <span class="avatar">師</span></span></header>
+  <main>
+    <section class="page-heading"><div><p class="eyebrow">TEACHER DASHBOARD / LAYOUT PREVIEW</p><h1>題目與回答，一眼分清。</h1><p>先選 Case，再展開小題；每個操作都留在所屬層級。</p></div><div class="summary"><div><strong id="case-count">3</strong><span>個 Case</span></div><div><strong id="open-count">2</strong><span>題搶答中</span></div><div><strong id="answer-count">7</strong><span>份回答</span></div></div></section>
+    <div class="toolbar"><span>題組層級預覽</span><button type="button" id="export-demo" class="export-button">彙整至 Google Sheet ↗</button></div>
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Case 導覽">
+        <section class="panel create-panel"><div class="section-title"><span class="section-index">01</span><div><p class="eyebrow">CREATE</p><h2>建立題目</h2></div></div><p>單題或題組由此建立，不和已建立的題目混排。</p><button type="button" id="new-case" class="primary full">＋ 新增 Case</button></section>
+        <section class="panel library-panel"><div class="section-title"><span class="section-index">02</span><div><p class="eyebrow">CASE LIBRARY</p><h2>題目管理</h2></div></div><div class="library-divider"></div><nav id="case-nav" aria-label="題目清單"></nav></section>
+      </aside>
+      <section class="content" aria-label="題目及回答詳情"><div id="main-view"></div></section>
+    </div>
+    <footer>預覽版只呈現新版資訊層級與操作位置。正式功能與 OpenSpec 文件尚未修改。</footer>
+  </main>
+  <dialog id="create-dialog" aria-labelledby="create-title"><form id="create-form"><div class="dialog-head"><div><p class="eyebrow">NEW CASE</p><h2 id="create-title">新增 Case</h2></div><button type="button" id="close-dialog" class="icon-button" aria-label="關閉">✕</button></div><p class="dialog-intro">先選擇題型，再填寫該層級的內容。</p><label class="field" for="case-number">Case 編號<input id="case-number" type="number" min="1" step="1" value="3" required></label><fieldset class="kind-picker"><legend>題型</legend><label><input type="radio" name="kind" value="single" checked><span><strong>單題</strong><small>Case 直接是一道可搶答題目</small></span></label><label><input type="radio" name="kind" value="group"><span><strong>題組</strong><small>Case 是資料夾，內含獨立搶答的小題</small></span></label></fieldset><div id="single-fields" class="form-section"><h3>單題內容</h3><label class="field" for="single-content">題目<textarea id="single-content" rows="2" placeholder="輸入單題內容"></textarea></label><label class="field short-field" for="single-duration">搶答時間（秒）<input id="single-duration" type="number" min="1" max="3600" value="60"></label></div><div id="group-fields" class="form-section" hidden><h3>題組內容</h3><label class="field" for="group-title">大題標題<input id="group-title" placeholder="例如：邊界條件與序列測試"></label><div class="subsection-head"><strong>小題</strong><button type="button" id="add-demo-part" class="quiet">＋ 增加小題</button></div><div id="part-fields"></div></div><div class="dialog-actions"><button type="button" id="cancel-dialog" class="quiet">取消</button><button type="submit" class="primary">加入預覽</button></div><p id="form-error" class="form-error" role="alert"></p></form></dialog>
+  <dialog id="part-dialog" aria-labelledby="part-dialog-title"><form id="part-form"><div class="dialog-head"><div><p class="eyebrow">NEW SUBQUESTION</p><h2 id="part-dialog-title">新增小題</h2></div><button type="button" id="close-part-dialog" class="icon-button" aria-label="關閉">✕</button></div><p id="part-dialog-context" class="dialog-intro"></p><label class="field" for="new-part-content">小題內容<textarea id="new-part-content" rows="3" maxlength="2000" placeholder="輸入要讓學生回答的小題" required></textarea></label><label class="field short-field" for="new-part-duration">搶答時間（秒）<input id="new-part-duration" type="number" min="1" max="3600" step="1" value="60" required></label><div class="dialog-actions"><button type="button" id="cancel-part-dialog" class="quiet">取消</button><button type="submit" class="primary">新增小題</button></div><p id="part-form-error" class="form-error" role="alert"></p></form></dialog>
+  <p id="notice" class="notice" role="status" hidden></p>
+</body>
+</html>

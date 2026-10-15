@@ -1,0 +1,32 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {FileBlob,PresentationFile} from 'file:///C:/Users/Ian/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/@oai/artifact-tool/dist/artifact_tool.mjs';
+const base='C:/Users/Ian/Desktop/NCU/實驗室/SE_TA';
+const source=path.join(base,'deliverables','即時線上搶答系統_學生實作需求_含題組_評分標準.pptx');
+const candidate=path.join(base,'.pptx-build','candidate-v2.pptx');
+const p=await PresentationFile.importPptx(await FileBlob.load(source));
+const s=p.slides.items[9];
+function edit(oldValue,newValue,position){
+ const matches=s.shapes.items.filter(x=>x.text?.toString()===oldValue);
+ if(matches.length!==1) throw new Error(`Text ${JSON.stringify(oldValue)}: ${matches.length} matches`);
+ const shape=matches[0]; shape.text.replace(oldValue,newValue);
+ if(position) shape.position=position;
+ return shape;
+}
+edit('Case 依列排列；同一題組的小題依序向右寫入','大題逐列向下；題組小題在同一列向右填入；實作時寫入「回答_學號」。');
+edit('Step 1 → Sequence','大題：縱向往下',{left:76,top:510,width:540,height:49});
+edit('Case 1-1 → C19\nCase 1-2 → D19\nCase 1-3 → E19\nCase 2 → C20\n…\nCase 7 → C25','Case 1 → C19\nCase 2 → C20；Case 7 → C25',{left:76,top:558,width:540,height:90});
+edit('每格只寫第一名；缺列才新增','題組小題：同列往右',{left:664,top:513,width:540,height:43});
+edit('回答_學號','1-1=C19　1-2=D19　1-3=E19',{left:664,top:562,width:540,height:70});
+const left=s.images.items[0];
+left.replace({blob:await fs.readFile(path.join(base,'.pptx-build','sheet-step1-panel.png')),contentType:'image/png',alt:'Google Sheet Step 1 Sequence 區域，Case 1 至 Case 7 逐列排列'});
+left.frame={left:76,top:180,width:540,height:300};
+const priorBorder=s.shapes.items.find(x=>x.id==='5');
+priorBorder.position={left:74,top:178,width:544,height:304};
+s.images.add({blob:await fs.readFile(path.join(base,'.pptx-build','dashboard-export-panel.png')),contentType:'image/png',alt:'教師端彙整至 Google Sheet 按鈕截圖節錄',position:{left:664,top:180,width:540,height:300}});
+s.shapes.add({geometry:'rect',position:{left:662,top:178,width:544,height:304},fill:'none',line:{fill:'#174C42',width:2}});
+s.speakerNotes.text='左圖節錄 Google Sheet Step 1 的 Sequence 區域；每一大題往下一列，Case 1 位於第 19 列，Case 2 位於第 20 列，依序往下。若某 Case 有題組，小題在同一列向右填入，例如 1-1 到 C19、1-2 到 D19、1-3 到 E19。右圖為教師端的「彙整至 Google Sheet」按鈕。每格只匯出該單題或小題第一名的「回答_學號」。第 7 題及以後僅在 Sheet 尚無對應 Case 列時新增列。兩張圖均節錄自使用者提供的畫面。';
+await (await PresentationFile.exportPptx(p)).save(candidate);
+const png=await p.export({slide:s,format:'png',scale:1});
+await fs.writeFile(path.join(base,'.pptx-build','slide-10-v2.png'),new Uint8Array(await png.arrayBuffer()));
+console.log(candidate);

@@ -30,7 +30,7 @@ export class Events {
     if (!this.valid(c)) return;
     if (c.blocked) { c.dirty = true; return; }
     const value = c.role === 'teacher' ? teacherSnapshot(this.store, this.config)
-      : studentSnapshot(this.store, c.session.studentNumber);
+      : studentSnapshot(this.store, c.session.studentNumber, c.session.groupNumber);
     const stable = JSON.stringify({ ...value, serverNow: undefined });
     if (stable === c.last) return;
     c.last = stable; this.write(c, `event: snapshot\ndata: ${JSON.stringify(value)}\n\n`);
@@ -41,6 +41,11 @@ export class Events {
     }
   }
   teachers() { for (const c of this.clients) if (c.role === 'teacher') this.send(c); }
+  revoke(role, token) {
+    for (const c of this.clients) if (c.role === role && c.token === token) {
+      c.res.end('event: auth-required\ndata: {}\n\n'); this.clients.delete(c);
+    }
+  }
   heartbeat() {
     this.sessions.prune();
     for (const c of this.clients) if (this.valid(c)) this.write(c, ': heartbeat\n\n');

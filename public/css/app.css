@@ -9,3 +9,11 @@
 .answer-confirm .answer-preview{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f8f4;padding:14px;border-radius:9px;max-height:35vh;overflow:auto}
 .answer-confirm .confirm-question{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:650}
 .answer-confirm .control-actions{justify-content:flex-end;margin-top:18px}
+.student-group-title{color:var(--muted);font-size:13px;margin:10px 0 -8px;overflow-wrap:anywhere}
+.student-login #group-number{font-variant-numeric:tabular-nums}
+.student-login label[for="group-number"]{margin-top:18px}
+.student-heading .identity{max-width:min(56%,340px);min-width:0;gap:9px}
+.student-heading .identity-values{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap;min-width:0}
+.student-heading #identity-number{font-size:17px;font-weight:800;line-height:1.4;overflow-wrap:anywhere}
+.student-heading #identity-group{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:5px 11px;border-radius:9px;background:#dfece2;color:#174e44;font-size:18px;font-weight:850;line-height:1.2}
+@media(max-width:560px){.student-heading{align-items:flex-start}.student-heading .identity{max-width:60%}.student-heading #identity-number{font-size:15px}.student-heading #identity-group{font-size:16px}}

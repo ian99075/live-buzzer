@@ -17,13 +17,16 @@ export async function fixture(t, options = {}) {
     return { status: response.status, data: text ? JSON.parse(text) : null, headers: response.headers,
       cookie: response.headers.get('set-cookie')?.split(';')[0] };
   }
-  const login = async (role = 'student', studentNumber = '00123') => {
+  const studentGroups = new Map();
+  const login = async (role = 'student', studentNumber = '00123', explicitGroup) => {
+    const groupNumber = explicitGroup ?? studentGroups.get(studentNumber) ?? studentGroups.size + 1;
+    if (role === 'student' && !studentGroups.has(studentNumber)) studentGroups.set(studentNumber, groupNumber);
     const r = await request(`/api/${role}/session`, { method: 'POST', body: role === 'teacher'
-      ? { username: 'teacher', password: 'test-password-only' } : { studentNumber } });
+      ? { username: 'teacher', password: 'test-password-only' } : { studentNumber, groupNumber } });
     return r.cookie;
   };
   const question = async (cookie, caseNumber = 1) => {
-    const q = (await request('/api/teacher/questions', { method: 'POST', cookie, body: { caseNumber, content: `第 ${caseNumber} 題` } })).data;
+    const q = (await request('/api/teacher/questions', { method: 'POST', cookie, body: { content: `第 ${caseNumber} 題` } })).data;
     await request(`/api/teacher/questions/${q.id}/start`, { method: 'POST', cookie }); return q;
   };
   return { ...app, config, base, request, login, question };

@@ -6,7 +6,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 test('教師計時控制、學生暫停投影、狀態衝突與權限', async t => {
   const f = await fixture(t); const teacher = await f.login('teacher'); const student = await f.login('student', '00123');
   const created = await f.request('/api/teacher/questions', { method: 'POST', cookie: teacher,
-    body: { caseNumber: 1, content: '題目', durationSeconds: 30 } });
+    body: { content: '題目', durationSeconds: 30 } });
   assert.equal(created.status, 201); const id = created.data.id;
   assert.equal(created.data.durationSeconds, 30);
   assert.equal((await f.request(`/api/teacher/questions/${id}/pause`, { method: 'POST', cookie: teacher })).status, 409);
@@ -42,8 +42,8 @@ test('教師即時排名與失格遞補，學生白名單及事件不洩漏', as
   assert.equal(view.provisionalLeader.studentNumber, '乙');
   assert.deepEqual(view.submissions.map(s => s.priorWinCount), [1, 0]);
   const own = (await f.request('/api/student/questions', { cookie: b })).data;
-  assert.deepEqual(Object.keys(own).sort(), ['questions', 'serverNow', 'studentNumber']);
-  assert.deepEqual(Object.keys(own.questions[0]).sort(), ['caseNumber', 'content', 'deadlineAt', 'id', 'remainingMs', 'status', 'submitted']);
+  assert.deepEqual(Object.keys(own).sort(), ['groupNumber', 'questions', 'serverNow', 'studentNumber']);
+  assert.deepEqual(Object.keys(own.questions[0]).sort(), ['caseNumber', 'content', 'deadlineAt', 'groupTitle', 'id', 'partNumber', 'remainingMs', 'status', 'submitted']);
   assert.equal(JSON.stringify(own).includes('甲答'), false);
   await f.request(`/api/teacher/questions/${q2.id}/stop`, { method: 'POST', cookie: teacher });
   view = (await f.request(`/api/teacher/questions/${q2.id}`, { cookie: teacher })).data;

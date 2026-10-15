@@ -19,6 +19,10 @@ export class Sessions {
   cookie(role, token) {
     return `${role}_session=${token}; Path=/; HttpOnly; SameSite=Strict${this.config.secureCookie ? '; Secure' : ''}`;
   }
+  clearCookie(role) {
+    return `${role}_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${this.config.secureCookie ? '; Secure' : ''}`;
+  }
+  revoke(token) { this.entries.delete(hash(token)); }
   find(token, role) {
     if (!token) return null;
     const key = hash(token); const session = this.entries.get(key);

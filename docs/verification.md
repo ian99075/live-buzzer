@@ -1,5 +1,14 @@
 # 專案驗收紀錄
 
+## grouped-case-questions 後續 Apply：連續編號、遞補匯出與登出（2026-10-13）
+
+此節是已修訂 Proposal／Design／Specs／Tasks 後的追加 Apply 證據；先前 20 項題組任務的 Verify 報告只適用修訂前範圍。新增規則仍待另行執行正式 `$openspec-verify-change`，沒有同步主規格或歸檔。
+
+- `npm test` 44/44 通過，OpenSpec change 嚴格驗證通過；OpenAPI 已重新產生，合約測試通過。涵蓋建題請求拒絕手動題號、並行建立連號、刪大題與中間小題遞補、穩定 UUID／groupId、學生 SSE 只收公開欄位、登出立即中止該教師 SSE 且其他教師／學生不受影響。
+- 模擬 Google API 驗證：刪 Case 2 後舊格 C21 改寫到 C20，刪小題 1-2 後舊 E 格改寫到 D 格，未使用的已確認格清空；回應遺失時先讀回可疑格，人工改過的舊格拒絕清空；Case 8 已插入列在刪題與重建後重用。這些測試不使用正式憑證。
+- 隔離 `127.0.0.1:3109` 瀏覽器預覽使用合成帳密與學號：教師建 Case 1 單題、Case 2 題組後，刪 Case 1，題組及小題顯示 1、1-1、1-2；再新增 1-3 並刪中間 1-2，原 1-3 遞補顯示為 1-2。教師可見學生回答與暫定第一；學生確認送出後只見「已送出」，未見名次／得標資訊。教師登出返回登入畫面，學生保持登入，重新登入後題組與回答仍在。教師 390px 與學生 390px 視窗均未出現橫向溢出。測試預覽結束後已停止。
+- 本輪未對真實 Google Sheet 插列、解除合併、移位覆寫或清空，也未進行實體區域網路跨裝置驗收。2026-09-23 的 Case 1 寫入／還原屬原始單題功能證據，不代表新增題組匯出已在雲端驗收。
+
 更新：2026-10-08。下方 2026-09-24 的紀錄保留原始 `live-buzzer` change 的歷史情境；本次新 change 的結果先列於此。
 
 ## timed-priority-buzz 實作驗收（2026-10-08）
@@ -109,8 +118,52 @@
 
 本次對照核心裁決、角色投影、授權、SSE、Google writer 與新版介面，未發現阻擋既定功能的問題。自動測試 13/13 通過，OpenSpec 嚴格驗證通過。真實 Google 整合證據沿用 8.4；本次模擬驗收不代表再次驗證雲端權限或實體教室網路。
 
+## 題組與可擴充 Case 的 Apply 驗收（2026-10-13）
+
+變更：`openspec/changes/grouped-case-questions/`。本輪先完成 Proposal／Design／Specs／Tasks，再依 Apply 實作，尚未執行獨立的 Verify、Sync 或 Archive。
+
+- `npm test`：36/36 通過，包含 Case 7 與跳號、轉組 UUID／回答保留、小題優先權與學生私有投影。OpenAPI 重新產生，合約測試通過；`openspec validate grouped-case-questions --type change --strict --no-interactive` 通過。
+- 模擬 Google API：Case 7 首次插列、Case 10 預留 7–10、既有 Case 標籤／列 metadata 沿用、清掉 B 欄文字後由 metadata 恢復、結構批次回應遺失後重試、不重複插列、D19:E19 局部解除合併而其他列保持合併、錯位標籤拒絕寫入、RAW 格數不符回錯。已匯出後刪題待清空、同座標重建得標者優先也由模擬測試覆蓋。
+- 隔離測試預覽 `127.0.0.1:3109`：教師建立 Case 7 題組三小題，再追加 7-4；各小題草稿獨立。學生在 7-1 輸入草稿時追加小題，草稿保留；確認彈窗送出後只顯示「已送出」，教師看到全部回答和暫定第一。結算後匯出清單顯示 `Case 7-1 → '工作表1'!C25`，以及精確 `回答_學號` 文字。
+- 同一隔離預覽：另建 Case 1 單題並開放，學生填寫草稿後轉為 1-1；題目 UUID、倒數和草稿保留。教師在 7-2 的編輯表單輸入未儲存文字時，學生送出回答觸發 SSE；表單文字、焦點與游標仍保留。學生快照未顯示得標、順位或其他學生資料。
+- 390px 瀏覽器視窗檢查教師與學生介面：教師單欄、建題表單可操作；兩端 `scrollWidth <= innerWidth`，沒有橫向溢出。視窗設定已重設。
+- 本輪未使用真實服務帳號修改 Google Sheet，也未測試真實插列／解除合併；先前 2026-09-23 的 C19 實際寫入只證明舊單題路徑。新結構的真實驗收須先備份並另取得指定範圍授權。教室實體區域網路未在本輪重測；既有區域網路使用者驗收與本輪模擬瀏覽器測試分開記錄。
+
 ## OpenSpec 流程收尾（2026-09-24）
 
 已修訂過期 Proposal／Design／Specs 註解，依 openspec-verify-change 完成 23 條需求、37 個情境及 26 項任務對照。新增匯出非法欄位與權限回歸測試，14/14 通過。三份主規格已同步至 openspec/specs/，差異內容逐字核對且嚴格驗證通過；變更封存於 openspec/changes/archive/2026-09-24-live-buzzer/，長期規則補齊於 openspec/config.yaml。
 
 本次不重新執行瀏覽器或真實 Google 寫入；沿用前述有日期與範圍的證據。正式與預覽服務保持關閉，實體教室網路仍未驗收。
+
+## 題組教師端分層版型補充驗收（2026-10-13）
+
+接續中斷的 Apply 前，重新核對 `grouped-case-questions` 的 Proposal、Design、三份差異 Spec 與 Tasks：OpenSpec 狀態顯示四類規劃文件完成，嚴格驗證通過。新增的 7.1–7.3 任務已依本節證據完成；此處仍屬 Apply，未執行獨立 Verify／Sync／Archive。
+
+- 正式教師頁把「建立題目」和「題目管理」拆成獨立卡片；Case 導覽可展開小題。題組大題頁顯示大標題、分界線、小題卡片，新增小題／改標題／刪整組集中在大題頁。小題詳情只顯示該題控制、回答與返回大題的麵包屑。
+- 使用隔離的 `npm run preview:test` 服務（`127.0.0.1:3109`、模擬 writer）建立 Case 1 題組，對「新增小題」彈窗填入內容與 30 秒，確認後出現 1-3；另測試取消後沒有建立。建立 Case 7 單題並設定 120 秒，導航正常。
+- 開放 Case 7 後以合成學號送出回答，教師看到暫定第一與全份回答；再把開放中的單題轉為題組，原回答和倒數保留為 7-1。從大題頁追加 45 秒的 7-2 後，7-1 仍在搶答且原回答保留，7-2 保持草稿。
+- 教師在新增小題彈窗輸入未送出的文字，同時學生提交觸發 SSE；彈窗文字和輸入焦點仍在。390px 寬度下建立與管理卡片上下排列，`scrollWidth <= innerWidth`，沒有橫向溢出；測試後還原瀏覽器尺寸。
+- `npm test` 36/36 通過；`openspec validate grouped-case-questions --type change --strict --no-interactive` 通過；`git diff --check` 無空白錯誤。README 操作說明已更新為分層介面和兩種彈窗。本輪沒有呼叫真實 Google Sheet。
+
+## 教師端文字層級與得標資訊 Apply 補充驗收（2026-10-13）
+
+本次依 `grouped-case-questions` change 新增的 11.1–11.2 任務修正正式教師頁；尚未重新執行獨立 Verify、Sync 或 Archive。原 3109 手測課堂未重啟或清空；隔離預覽使用 `127.0.0.1:3110` 及模擬 writer，測試結束後已關閉。
+
+- 「新增題目/題組」已顯示於建立入口、彈窗標題與送出按鈕；題目管理中題目／題組標題為 15px，Case 輔助標籤為 10px。
+- 合成 Case 1 題組有兩個小題。TEST001 送出第一題後，教師端未結算詳情顯示暫定第一；提早結算後，題組卡片顯示「正式得標者」、18px 學號及回答。第二題在開放中收到同學回答時，只顯示「目前第一名 · 尚未結算」；無回答時顯示「尚未收到回答」。學生端只顯示已送出，未顯示順位或得標。
+- 實際瀏覽器在 390px 寬下，側欄與內容、兩張小題卡片均為單欄；`documentElement.scrollWidth=375 <= innerWidth=390`。截圖見 [390px 教師版面](teacher-layout-390.png)。
+- `npm test` 44/44 通過，`openspec validate grouped-case-questions --strict` 通過；首次沙箱內測試因本機連線 `EACCES` 失敗，於允許本機連線的環境重跑後全數通過。本次沒有呼叫真實 Google Sheet。
+
+## 教師端「搶答第一名」標籤微調（2026-10-13）
+
+沿用 `grouped-case-questions` 修訂既有 Proposal、question-management 差異 Spec、Design 與 Tasks，完成 12.1 Apply；獨立 Verify 尚待重新執行。
+
+- 使用隔離預覽 `127.0.0.1:3110` 建立合成 Case 1 題組，學生 TEST001 送出「整合驗收：這是完整回答」。未結算時教師仍見「目前排名第一 · 尚未結算」；提早結算後，小題詳情與題組卡片分別顯示「搶答第一名 · 將匯出」及「搶答第一名」，不再顯示「正式得標者」。
+- 瀏覽器實測小題卡片學號 18px、回答 16px；390px 視窗 `scrollWidth=375 <= innerWidth=390`，未產生水平溢出。截圖見 [390px 搶答第一名卡片](teacher-first-place-390.png)。
+- `npm test` 44/44 通過、`openspec validate grouped-case-questions --strict` 通過；本輪只測模擬服務，未寫入真實 Google Sheet。
+
+隔離驗收後發現操作中斷使先前的 3109 服務停止；已另以相同正式程式碼及現有 `.env` 憑證在 3109 啟動空課堂。新服務的本機與 `140.115.59.200:3109` 教師頁均回 HTTP 200；此啟動檢查沒有重新驗收真實 Google 寫入，也不能恢復舊服務的記憶體資料。
+
+## grouped-case-questions 最新獨立 Verify（2026-10-13）
+
+使用者手動測試後，依 `$openspec-verify-change` 重新對照目前 31 項 Tasks、11 條 Requirement、45 個 Scenario 及七項 Design 決策；`npm test` 在允許本機 HTTP 的環境中 44/44 通過，`openspec validate grouped-case-questions --strict` 通過。完整結果與一項非阻擋文案 warning 見 [最新 Verify 報告](grouped-case-questions-verification.md)。本次沒有對正式課堂或 Google Sheet 寫入，也沒有執行主規格同步或封存。

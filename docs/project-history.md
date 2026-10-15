@@ -1,5 +1,13 @@
 # 即時線上搶答系統：專案歷程與產出紀錄
 
+## 2026-10-14：grouped-case-questions 完成同步與歸檔
+
+最新 Verify 對照 31/31 任務、11 條需求及 45 個情境，44/44 自動測試與 OpenSpec 嚴格驗證通過；詳見 `docs/grouped-case-questions-verification.md`。三份差異規格已同步到 `openspec/specs/`，並封存於 `openspec/changes/archive/2026-10-14-grouped-case-questions/`；目前沒有進行中的 change。先前 Verify 提出的已匯出後「將匯出」文案提醒仍保留。本輪未寫入真實 Google Sheet。
+
+## 2026-10-13：同一 grouped-case-questions change 的後續修訂與 Apply
+
+因教師要求連續自動編號、刪題後遞補及登出，先在原 change 修訂 Proposal、Design、三份差異規格與 Tasks，再 Apply。產出包括後端與介面改動、OpenAPI／README／設定背景同步、模擬 Google 座標帳本及重試測試、教師／學生隔離瀏覽器驗收。`npm test` 44/44 與 OpenSpec 嚴格驗證通過；真實 Sheet 沒有寫入。此階段結束後仍待使用者手動測試與新版正式 Verify、主規格同步及歸檔。
+
 建立日期：2026-10-07（Asia/Taipei）
 
 紀錄範圍：本次對話中的 `live-buzzer` 搶答系統，自需求討論至 OpenSpec 封存、後續複核及區域網路討論。
@@ -321,6 +329,9 @@ OpenSpec 的行為規格與 [OpenAPI JSON][openapi] 是不同產出：前者記�
 | 日期 | 階段／change | 需求或問題 | 處理內容 | 新增／修改檔案 | 驗證方式與結果 | 尚待處理 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 待填 | 待填 | 待填 | 待填 | 待填 | 區分本次執行與沿用證據 | 待填 |
+| 2026-10-13 | grouped-case-questions Apply | 題組、Case 7 以後插列與既有列偵測 | 依已完成提案與設計實作資料模型、API、雙端介面、後端匯出計畫、Google 結構批次與重試 | `src/`、`public/`、`tests/`、`scripts/openapi.mjs`、`docs/openapi.json`、`README.md`、`openspec/config.yaml`、本 change 任務 | 36/36 自動測試、嚴格驗證、隔離瀏覽器教師／學生與 390px 通過；模擬 Google API 通過，真實 Sheet 未寫入 | 獨立 Verify、主規格同步、歸檔；如要真實結構驗收須先備份並取得明確範圍授權 |
+| 2026-10-13 | grouped-case-questions Verify | 獨立核對 Apply 是否符合 change 規格與設計 | 逐條對照 20 項任務、10 條需求、34 個情境與七項設計決策，保存報告並更新目前流程狀態 | `docs/grouped-case-questions-verification.md`、`docs/RESUME.md`、`README.md`、`openspec/config.yaml` | 36/36 自動測試與 OpenSpec 嚴格驗證通過；無 CRITICAL／WARNING；沒有真實 Google 結構寫入 | 主規格同步、歸檔；真實 Sheet 結構驗收須另備份與授權 |
+| 2026-10-14 | grouped-case-questions 最新 Verify、Sync、Archive | 完成追加教師介面規則後的流程收尾 | 重新對照 31 項任務、11 條需求、45 個情境；合併三份主規格並封存 change | `docs/grouped-case-questions-verification.md`、`openspec/specs/`、`openspec/changes/archive/2026-10-14-grouped-case-questions/` | 44/44 測試、主規格 3/3 驗證；無 critical，保留一項文案 warning；真實 Sheet 未寫入 | 如需修正文案或真實 Case 7+ 結構驗收，另行規劃與授權 |
 
 [proposal]: C:/Users/Ian/Desktop/NCU/實驗室/SE_TA/openspec/changes/archive/2026-09-24-live-buzzer/proposal.md
 [design]: C:/Users/Ian/Desktop/NCU/實驗室/SE_TA/openspec/changes/archive/2026-09-24-live-buzzer/design.md

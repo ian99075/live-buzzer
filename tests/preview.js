@@ -8,11 +8,15 @@ const port = Number(process.env.PREVIEW_PORT || 3000);
 const config = testConfig({ port, origin: `http://127.0.0.1:${port}`, testMode: true });
 let app, failNext = false, loseNextBuzz = false;
 function makeApp() {
-  const instance = createApp({ config, heartbeatMs: 1000, writer: async data => {
+  const previewValues = new Map();
+  const writer = async data => {
     await delay(1200);
     if (failNext) { failNext = false; throw new Error('模擬遠端失敗'); }
+    for (const item of data) previewValues.set(item.range, item.values[0][0]);
     console.log(`模擬匯出確認 ${data.length} 格；未連線 Google。`);
-  } });
+  };
+  writer.readCells = async items => new Map(items.map(item => [item.range, previewValues.get(item.range) ?? '']));
+  const instance = createApp({ config, heartbeatMs: 1000, writer });
   let suppressStudentEvent = false;
   const publish = instance.events.publish.bind(instance.events);
   instance.events.publish = studentNumber => {

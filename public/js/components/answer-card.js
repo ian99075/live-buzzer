@@ -3,7 +3,7 @@ import { api, element, message, validText } from '../api.js';
 export function answerCard(initial, { expired, isCurrent }) {
   let q = initial, state = q.submitted ? 'sent' : 'editable', frozen = '', candidate = '', online = false, clockOffset = 0;
   const root = element('form', 'panel answer-card'); root.dataset.questionId = q.id;
-  const tag = element('span', 'case-tag', `CASE ${q.caseNumber}`), title = element('h2');
+  const tag = element('span', 'case-tag'), groupTitle = element('p', 'student-group-title'), title = element('h2');
   const timer = element('strong', 'student-timer');
   const label = element('label', '', '你的回答'), input = element('textarea');
   input.id = `answer-${q.id}`; label.htmlFor = input.id; input.placeholder = '在這裡填寫回答…'; input.rows = 4;
@@ -19,10 +19,12 @@ export function answerCard(initial, { expired, isCurrent }) {
   const actions = element('div', 'control-actions');
   const cancel = element('button', '', '返回修改'), confirm = element('button', 'primary', '確認送出');
   cancel.type = confirm.type = 'button'; actions.append(cancel, confirm); dialog.append(heading, questionPreview, preview, hint, actions);
-  root.append(tag, title, timer, label, input, inputHint, button, feedback, dialog);
+  root.append(tag, groupTitle, title, timer, label, input, inputHint, button, feedback, dialog);
   const remaining = () => q.status === 'open' ? Math.max(0, q.deadlineAt - (Date.now() - clockOffset)) : q.remainingMs;
   const canSend = () => q.status === 'open' && remaining() > 0 && online && isCurrent();
   function render() {
+    tag.textContent = `CASE ${q.caseNumber}${q.partNumber ? `-${q.partNumber}` : ''}`;
+    groupTitle.textContent = q.groupTitle || ''; groupTitle.hidden = !q.groupTitle;
     title.textContent = q.content; root.dataset.state = state;
     const active = canSend();
     timer.textContent = q.status === 'paused' ? `已暫停 · 剩餘 ${Math.ceil(q.remainingMs / 1000)} 秒`
@@ -60,7 +62,7 @@ export function answerCard(initial, { expired, isCurrent }) {
   root.onsubmit = event => {
     event.preventDefault(); if (button.disabled || !isCurrent()) return;
     if (state === 'retryable') { void send(); return; }
-    candidate = input.value.trim(); questionPreview.textContent = q.content;
+    candidate = input.value.trim(); questionPreview.textContent = `${q.groupTitle ? `${q.groupTitle} · ` : ''}Case ${q.caseNumber}${q.partNumber ? `-${q.partNumber}` : ''}：${q.content}`;
     preview.textContent = candidate; dialog.showModal(); cancel.focus();
   };
   cancel.onclick = () => dialog.close();
