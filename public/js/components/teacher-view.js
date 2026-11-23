@@ -1,23 +1,14 @@
 import { api, element } from '../api.js';
 import { stateLabel } from './question-controls.js';
 
-function badge(q) { return element('span', `badge ${q.status}`, stateLabel(q.status)); }
 function leader(q) { return q.status === 'settled' ? q.winner : q.provisionalLeader; }
 function leaderLabel(q) { return q.status === 'settled' ? '搶答第一名 · 已結算' : '目前第一名 · 尚未結算'; }
 const caseLabel = q => `CASE ${q.caseNumber}${q.partNumber ? `-${q.partNumber}` : ''}`;
 
 export function caseGroups(questions) {
-  const groups = [];
-  for (const q of questions) {
-    let group = groups.find(item => item.caseNumber === q.caseNumber);
-    if (!group) {
-      group = { groupId: q.groupId, caseNumber: q.caseNumber, title: q.groupTitle || q.content,
-        isGroup: !!q.partNumber, questions: [] };
-      groups.push(group);
-    }
-    group.questions.push(q);
-  }
-  return groups;
+  return questions.map(q => q.kind === 'group'
+    ? { ...q, isGroup: true, questions: q.parts }
+    : { groupId: null, caseNumber: q.caseNumber, title: q.content, isGroup: false, questions: [q] });
 }
 
 export function renderCaseNavigation(container, groups, selection, expanded, { all, group: openGroup, question }) {
@@ -46,8 +37,8 @@ export function renderCaseNavigation(container, groups, selection, expanded, { a
         for (const q of item.questions) {
           const child = element('button', 'part-link'); child.type = 'button';
           child.setAttribute('aria-current', String(selection.questionId === q.id));
-          child.append(element('span', 'part-number', `${q.caseNumber}-${q.partNumber}`), element('span', 'part-name', q.content));
-          child.onclick = () => question(q.id); children.append(child);
+          child.append(element('span', 'part-number', `${item.caseNumber}-${q.partNumber}`), element('span', 'part-name', q.content));
+          child.onclick = () => openGroup(item.groupId); children.append(child);
         }
         nodes.push(children);
       }
@@ -76,32 +67,60 @@ export function renderOverview(container, groups, { group, question }) {
   container.replaceChildren(root);
 }
 
-export function renderGroupQuestions(container, group, choose) {
+export function renderGroupQuestions(container, group) {
   const heading = element('div', 'group-parts-heading');
-  heading.append(element('h3', '', '小題列表'), element('span', '', '點選小題，查看回答與單題操作'));
+  heading.append(element('h3', '', '小題列表'), element('span', '', '整組共用一位搶答第一名'));
   const grid = element('div', 'group-parts-grid');
-  for (const q of group.questions) {
+  const first = group.status === 'settled' ? group.winner : group.provisionalLeader;
+  for (const q of group.parts) {
     const card = element('article', 'group-part-card'), top = element('div', 'group-part-top');
-    top.append(element('span', 'part-tag', `${q.caseNumber}-${q.partNumber} · 小題`), badge(q));
+    top.append(element('span', 'part-tag', `${group.caseNumber}-${q.partNumber} · 小題`));
     card.append(top, element('h4', '', q.content));
-    const first = leader(q);
     const preview = element('div', `group-part-preview ${first ? '' : 'empty'}`);
     if (first) {
-      const identity = element('div', 'group-part-preview-identity');
-      identity.append(element('strong', 'group-part-preview-id', `學號 ${first.studentNumber}`),
-        element('span', 'student-group-badge', `G${first.groupNumber}`));
-      preview.append(element('span', 'group-part-preview-label', q.status === 'settled' ? '搶答第一名' : '目前第一名 · 尚未結算'),
-        identity, element('p', 'group-part-preview-answer', first.answer));
+      preview.append(element('span', 'group-part-preview-label', group.status === 'settled' ? '搶答第一名的這題回答' : '目前第一名的這題回答'),
+        element('p', 'group-part-preview-answer', first.answers?.[q.sourceKey] ?? ''));
     } else preview.append(element('span', 'group-part-preview-empty', '尚未收到回答'));
     card.append(preview);
-    const foot = element('div', 'group-part-foot'), timer = element('small');
-    if (q.status === 'open') timer.dataset.deadlineAt = q.deadlineAt;
-    else timer.textContent = stateLabel(q.status);
-    const open = element('button', '', '進入小題 →'); open.type = 'button'; open.onclick = () => choose(q.id);
-    foot.append(element('small', '', `${q.submissions.length} 份回答 · `), timer, open);
-    card.append(foot); grid.append(card);
+    grid.append(card);
   }
   container.replaceChildren(element('div', 'group-divider'), heading, grid);
+}
+
+export function renderGroupResponses(container, group, { updated, failed, locked }) {
+  const nodes = [], heading = element('div', 'table-heading');
+  heading.append(element('h3', '', '整組全部回答'), element('span', '', `即時優先順位 · ${group.submissions.length} 份`));
+  nodes.push(heading);
+  const ordered = [...group.submissions].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.acceptedOrder - b.acceptedOrder);
+  for (const entry of ordered) {
+    const card = element('article', 'response-row');
+    card.dataset.winner = String((group.status === 'settled' ? group.winner : group.provisionalLeader)?.id === entry.id);
+    const identity = element('div', 'student-cell-identity');
+    if (entry.rank) identity.append(element('span', 'student-rank', `#${entry.rank}`));
+    identity.append(element('strong', 'student-number', `學號 ${entry.studentNumber}`),
+      element('span', 'student-group-badge', `G${entry.groupNumber}`));
+    card.append(identity, element('small', 'accepted-order', `同組先前第一名 ${entry.priorWinCount} 次 · 接收第 ${entry.acceptedOrder} 份`));
+    for (const part of group.parts) {
+      const answer = element('div', 'group-submission-answer');
+      answer.append(element('strong', '', `${group.caseNumber}-${part.partNumber} · ${part.content}`),
+        element('p', 'answer-text', entry.answers?.[part.sourceKey] ?? ''));
+      card.append(answer);
+    }
+    if (entry.disqualified) card.append(element('span', 'other-label', '已取消資格'));
+    else {
+      const button = element('button', 'danger disqualify-button', '取消整組資格');
+      button.type = 'button'; button.disabled = locked;
+      button.onclick = async () => {
+        if (!window.confirm(`取消學號 ${entry.studentNumber}（G${entry.groupNumber}）整組回答資格？本題組無法再次送出。`)) return;
+        button.disabled = true;
+        try { await api(`/api/teacher/groups/${group.groupId}/submissions/${entry.id}/disqualify`, { method: 'POST' }); await updated(); }
+        catch (error) { failed(error); button.disabled = false; window.alert(error.message); }
+      };
+      card.append(button);
+    }
+    nodes.push(card);
+  }
+  container.replaceChildren(...nodes);
 }
 
 export function renderDetailResponses(container, q, { updated, failed, locked }) {

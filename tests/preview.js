@@ -3,20 +3,29 @@ import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createApp } from '../src/server.js';
 import { testConfig } from './helpers.js';
+import { fakeSheet } from './sheet-fixture.js';
 
 const port = Number(process.env.PREVIEW_PORT || 3000);
+const host = process.env.PREVIEW_HOST || '127.0.0.1';
 const config = testConfig({ port, origin: `http://127.0.0.1:${port}`, testMode: true });
 let app, failNext = false, loseNextBuzz = false;
 function makeApp() {
-  const previewValues = new Map();
-  const writer = async data => {
-    await delay(1200);
-    if (failNext) { failNext = false; throw new Error('模擬遠端失敗'); }
-    for (const item of data) previewValues.set(item.range, item.values[0][0]);
-    console.log(`模擬匯出確認 ${data.length} 格；未連線 Google。`);
+  const sheet = fakeSheet();
+  for (const [key, questionCell, answerCell] of [
+    ['1_1','C5','H5'], ['1_2','C6','H6'], ['2_1','C8','H8'], ['2_2','C9','H9'], ['3','C11','G11'], ['4','C13','G13']]) {
+    sheet.put(questionCell, `題目 ${key}`, `$q_${key}$`);
+    sheet.put(answerCell, `$a_${key}$`);
+  }
+  const sheetClient = {
+    readGrid: () => sheet.client.readGrid(),
+    async write(items, grid) {
+      await delay(1200);
+      if (failNext) { failNext = false; throw new Error('模擬遠端失敗'); }
+      await sheet.client.write(items, grid);
+      console.log(`模擬匯出確認 ${items.length} 格；未連線 Google。`);
+    },
   };
-  writer.readCells = async items => new Map(items.map(item => [item.range, previewValues.get(item.range) ?? '']));
-  const instance = createApp({ config, heartbeatMs: 1000, writer });
+  const instance = createApp({ config, heartbeatMs: 1000, sheetClient });
   let suppressStudentEvent = false;
   const publish = instance.events.publish.bind(instance.events);
   instance.events.publish = studentNumber => {
@@ -32,7 +41,7 @@ function makeApp() {
   });
   return instance;
 }
-async function start() { app = makeApp(); await new Promise(resolve => app.server.listen(port, '127.0.0.1', resolve)); }
+async function start() { app = makeApp(); await new Promise(resolve => app.server.listen(port, host, resolve)); }
 await start();
 console.log(`僅供測試：http://127.0.0.1:${port}/teacher\n帳號 teacher / 密碼 test-password-only\nstdin 控制：fail-next-export、lose-next-buzz、disconnect、restart、stop`);
 const lines = createInterface({ input: process.stdin });

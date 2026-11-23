@@ -24,9 +24,9 @@ test('倒數設定、暫停／繼續及結算後不可重開', () => {
   const q = s.add('題目'); assert.equal(q.durationSeconds, 60);
   assert.throws(() => s.add('題目', 0), { status: 400 });
   assert.throws(() => s.add('題目', 3601), { status: 400 });
-  s.edit(q.id, '新題目', 1); assert.equal(q.remainingMs, 1000);
+  s.editDuration(q.id, 1); assert.equal(q.remainingMs, 1000);
   s.status(q.id, 'open'); assert.equal(q.status, 'open');
-  assert.throws(() => s.edit(q.id, '修改', 2), { status: 409 });
+  assert.throws(() => s.editDuration(q.id, 2), { status: 409 });
   time.advance(200); s.status(q.id, 'paused'); assert.equal(q.remainingMs, 800);
   assert.equal(submit(s, q.id, '001', '暫停時'), false);
   time.advance(5000); assert.equal(q.remainingMs, 800);
@@ -72,7 +72,7 @@ test('刪除開放題目會撤銷其倒數，其餘開放題仍可作答及到�
   s.status(a.id, 'open'); s.status(b.id, 'open');
   s.remove(a.id);
   assert.equal(time.pending(), 1);
-  assert.equal(b.caseNumber, 1);
+  assert.equal(b.caseNumber, 2);
   assert.equal(submit(s, a.id, '001', '舊題答案'), false);
   assert.equal(submit(s, b.id, '001', '保留題答案'), true);
   time.advance(1000); assert.equal(b.status, 'settled'); assert.equal(b.winnerKey, '001');
@@ -111,41 +111,35 @@ test('已結算題目的得標者失格後，其他開放題立即重新計算�
   s.close();
 });
 
-test('開放中的單題轉為 1-1 保留 ID、計時、回答，已匯出題也可轉換', () => {
+test('課堂內單題轉題組遭拒；題組開始後不可追加或單刪小題', () => {
   const time = classroom(), s = time.store;
-  const q = s.add('原題', 30); s.status(q.id, 'open');
-  submit(s, q.id, '甲', '答案'); time.advance(3000, false);
-  const deadline = q.deadlineMono, submission = q.submissions.get('甲');
-  const group = s.convertToGroup(q.id, '題組標題');
-  assert.equal(group.title, '題組標題'); assert.equal(q.partNumber, 1);
-  assert.equal(q.deadlineMono, deadline); assert.equal(q.submissions.get('甲'), submission);
-  assert.equal(s.get(q.id), q); assert.equal(s.addPart(group.id, '新題').partNumber, 2);
-  assert.equal(submit(s, q.id, '乙', '後續答案'), true);
-  s.status(q.id, 'settled'); q.confirmedExport = true;
-  assert.equal(q.winnerKey, '甲'); assert.equal(q.confirmedExport, true);
-  assert.throws(() => s.convertToGroup(q.id, '再轉'), { status: 409 });
-  const settled = s.add('已結算'); s.status(settled.id, 'open');
-  submit(s, settled.id, '丙', '答'); s.status(settled.id, 'settled'); settled.confirmedExport = true;
-  s.convertToGroup(settled.id, '第二組');
-  assert.equal(settled.partNumber, 1); assert.equal(settled.winnerKey, '丙');
-  assert.equal(settled.confirmedExport, true); s.close();
+  const q = s.add('原題', 30);
+  assert.throws(() => s.convertToGroup(q.id, '題組標題'), { status: 409 });
+  const group = s.addGroup('題組', [{ content: '1-1' }, { content: '1-2' }]);
+  s.groupStatus(group.id, 'open');
+  assert.throws(() => s.addPart(group.id, '1-3'), { status: 409 });
+  assert.throws(() => s.remove(group.questions[0].id), { status: 409 });
+  assert.throws(() => s.status(group.questions[0].id, 'open'), { status: 409 });
+  s.close();
 });
 
-test('同組小題按結算得標次數即時重排，同時到期依小題序號裁決', () => {
+test('題組共用倒數、提交與唯一第一名，到期只結算一次', () => {
   const time = classroom(), s = time.store;
-  const { id: groupId, questions: [first, second] } = s.addGroup('題組', [
-    { content: '1-1', durationSeconds: 1 }, { content: '1-2', durationSeconds: 1 },
-  ]);
-  s.status(first.id, 'open'); s.status(second.id, 'open');
-  submit(s, first.id, '甲', '第一答');
-  submit(s, second.id, '甲', '第二答'); submit(s, second.id, '乙', '後答');
-  assert.equal(s.submissionById(second, s.ranking(second)[0].id).studentNumber, '甲');
-  time.advance(1000, false); assert.equal(s.settleDue(), 2);
-  assert.equal(first.winnerKey, '甲'); assert.equal(second.winnerKey, '乙');
-  const third = s.addPart(groupId, '1-3'); s.status(third.id, 'open');
-  submit(s, third.id, '甲', '第三答'); submit(s, third.id, '丙', '另一答');
-  assert.equal(s.submissionById(third, s.ranking(third)[0].id).studentNumber, '丙');
-  s.disqualify(first.id, first.submissions.get('甲').id);
-  assert.equal(s.submissionById(third, s.ranking(third)[0].id).studentNumber, '甲');
+  const created = s.addGroup('題組', [{ content: '1-1' }, { content: '1-2' }]);
+  const group = s.group(created.id);
+  s.editGroupDuration(group.id, 1); s.groupStatus(group.id, 'open');
+  s.registerStudent('甲', 2); s.registerStudent('乙', 3);
+  time.advance(200, false); s.groupStatus(group.id, 'paused');
+  assert.equal(group.remainingMs, 800);
+  assert.equal(s.submitGroup(group.id, '甲', { '1_1': '一', '1_2': '二' }, 2), false);
+  s.groupStatus(group.id, 'open');
+  assert.equal(s.submitGroup(group.id, '甲', { '1_1': '第一答', '1_2': '第二答' }, 2), true);
+  assert.equal(s.submitGroup(group.id, '乙', { '1_1': '後答一', '1_2': '後答二' }, 3), true);
+  assert.equal(group.submissions.size, 2);
+  time.advance(800, false); assert.equal(s.settleDue(), 1);
+  assert.equal(group.winnerKey, '甲');
+  s.disqualifyGroup(group.id, group.submissions.get('甲').id);
+  assert.equal(group.winnerKey, '乙');
+  assert.equal(s.submitGroup(group.id, '甲', { '1_1': '重送', '1_2': '重送' }, 2), false);
   s.close();
 });

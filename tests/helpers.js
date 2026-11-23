@@ -1,10 +1,12 @@
 import { createApp } from '../src/server.js';
 import { readConfig } from '../src/config.js';
+import { fakeSheet } from './sheet-fixture.js';
 
 export const testConfig = extra => ({ ...readConfig({ TEACHER_USERNAME: 'teacher', TEACHER_PASSWORD: 'test-password-only', PORT: '0' }), ...extra });
 export async function fixture(t, options = {}) {
   const config = options.config || testConfig();
-  const app = createApp({ ...options, config });
+  const sheet = options.sheet || fakeSheet();
+  const app = createApp({ ...options, config, sheetClient: options.sheetClient || sheet.client });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   config.origin = base;
@@ -26,10 +28,13 @@ export async function fixture(t, options = {}) {
     return r.cookie;
   };
   const question = async (cookie, caseNumber = 1) => {
-    const q = (await request('/api/teacher/questions', { method: 'POST', cookie, body: { content: `第 ${caseNumber} 題` } })).data;
+    sheet.put(`C${caseNumber + 4}`, `第 ${caseNumber} 題`, `$q_${caseNumber}$`);
+    sheet.put(`H${caseNumber + 4}`, `$a_${caseNumber}$`);
+    await request('/api/teacher/questions/import-google-sheet', { method: 'POST', cookie });
+    const q = (await request('/api/teacher/questions', { cookie })).data.questions.find(item => item.caseNumber === caseNumber);
     await request(`/api/teacher/questions/${q.id}/start`, { method: 'POST', cookie }); return q;
   };
-  return { ...app, config, base, request, login, question };
+  return { ...app, sheet, config, base, request, login, question };
 }
 export async function stream(base, role, cookie) {
   const controller = new AbortController();

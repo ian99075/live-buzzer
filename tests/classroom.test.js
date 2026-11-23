@@ -1,82 +1,67 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Classroom } from '../src/classroom.js';
-import { submit } from './grouped-submit.js';
-import { Sessions } from '../src/auth.js';
-import { testConfig } from './helpers.js';
-import { readConfig } from '../src/config.js';
+import { fakeSheet } from './sheet-fixture.js';
 
-test('設定、登入與工作階段只在記憶體中', () => {
-  assert.throws(() => readConfig({}), /TEACHER_USERNAME/);
-  const config = testConfig({ sessionMs: 10, secureCookie: true }); let now = 0;
-  const auth = new Sessions(config, () => now);
-  auth.teacher('teacher', 'test-password-only');
-  assert.throws(() => auth.teacher('other', 'test-password-only'), { status: 401 });
-  assert.throws(() => auth.teacher('teacher', 'wrong'), { status: 401 });
-  const token = auth.create('student', { studentNumber: '00123' });
-  assert.equal(auth.find(token, 'student').studentNumber, '00123');
-  assert.equal(auth.find(token, 'teacher'), null);
-  assert.equal(auth.entries.has(token), false);
-  assert.match(auth.cookie('student', token), /HttpOnly; SameSite=Strict; Secure/);
-  now = 11; assert.equal(auth.find(token, 'student'), null);
+const source = () => {
+  const sheet = fakeSheet();
+  for (const [key, questionCell, answerCell] of [
+    ['1_1','C5','H5'], ['1_2','C6','H6'], ['1_3','C7','H7'], ['3','C11','G11']]) {
+    sheet.put(questionCell, `題目 ${key}`, `$q_${key}$`);
+    sheet.put(answerCell, `$a_${key}$`);
+  }
+  return sheet;
+};
+
+test('增量匯入更新草稿文字、保留秒數與進行中題，缺少鍵不自動刪除', () => {
+  const sheet = source(), store = new Classroom();
+  assert.equal(store.importQuestions(sheet.grid()).added, 4);
+  const q1 = store.sourceIndex.get('1_1'), q2 = store.sourceIndex.get('1_2');
+  const group = store.caseIndex.get(1);
+  store.editGroupDuration(group.id, 95);
+  sheet.put('C5', '改過的題目', '$q_1_1$');
+  sheet.put('C6', '不得覆蓋進行中題', '$q_1_2$');
+  sheet.put('C7', '原題目', '');
+  assert.equal(store.importQuestions(sheet.grid()).updated, 2);
+  assert.equal(q1.id, store.sourceIndex.get('1_1').id);
+  assert.equal(group.durationSeconds, 95);
+  assert.equal(q1.content, '改過的題目');
+  assert.equal(q2.content, '不得覆蓋進行中題');
+  store.groupStatus(group.id, 'open');
+  sheet.put('C6', '進行中不可覆蓋', '$q_1_2$');
+  store.importQuestions(sheet.grid());
+  assert.equal(q2.content, '不得覆蓋進行中題');
+  assert.deepEqual(store.all().map(q => [q.caseNumber, q.partNumber]), [[1,1],[1,2],[1,3],[3,null]]);
+  store.close();
 });
 
-test('多題獨立、全部回答、去重、結算鎖定與刪除重建', () => {
-  const s = new Classroom(); const a = s.add('題目一'); const b = s.add('題目二');
-  assert.equal(a.caseNumber, 1); assert.equal(b.caseNumber, 2);
-  assert.throws(() => s.add(' '), { status: 400 });
-  assert.throws(() => s.edit(a.id, ' '), { status: 400 });
-  s.status(a.id, 'open'); s.status(b.id, 'open');
-  assert.throws(() => submit(s, a.id, '001', ' '), { status: 400 });
-  assert.equal(submit(s, a.id, '001', '甲'), true);
-  assert.equal(submit(s, a.id, '002', '乙'), true);
-  assert.equal(submit(s, a.id, '001', '改答案'), false);
-  submit(s, b.id, '002', '第二題答案');
-  assert.equal(s.ranking(a)[0].id, a.submissions.get('001').id); assert.equal(b.winnerKey, null);
-  assert.equal(a.submissions.size, 2); assert.equal(a.submissions.get('001').answer, '甲');
-  s.status(a.id, 'settled'); assert.equal(submit(s, a.id, '003', '晚到'), false);
-  assert.equal(b.status, 'open'); assert.throws(() => s.status(a.id, 'open'), { status: 409 });
-  assert.equal(a.winnerKey, '001'); assert.equal(a.submissions.size, 2);
-  s.edit(a.id, '修正文字'); assert.equal(a.submissions.size, 2);
-  s.remove(a.id); assert.equal(b.caseNumber, 1);
-  const replacement = s.add('新題'); s.status(replacement.id, 'open');
-  assert.notEqual(replacement.id, a.id); assert.equal(submit(s, a.id, '004', '舊請求'), false);
-  assert.equal(replacement.submissions.size, 0); assert.equal(replacement.caseNumber, 2);
-  assert.deepEqual(new Classroom().all(), []);
-  s.close();
+test('草稿可刪小題；開始後單刪遭拒且刪整組不改其他 Case', () => {
+  const store = new Classroom(), sheet = source();
+  store.importQuestions(sheet.grid());
+  const group = store.caseIndex.get(1), later = store.sourceIndex.get('1_3'), single = store.sourceIndex.get('3');
+  store.remove(store.sourceIndex.get('1_2').id);
+  assert.equal(later.partNumber, 3);
+  assert.equal(later.id, store.sourceIndex.get('1_3').id);
+  store.registerStudent('001', 2); store.groupStatus(group.id, 'open');
+  const deadline = group.deadlineAt;
+  assert.equal(store.submitGroup(group.id, '001', { '1_1': '回答一', '1_3': '回答三' }, 2), true);
+  assert.throws(() => store.remove(later.id), { status: 409 });
+  assert.equal(group.deadlineAt, deadline);
+  assert.equal(group.submissions.size, 1);
+  store.removeGroup(store.caseIndex.get(1).id);
+  assert.equal(single.caseNumber, 3);
+  assert.equal(single.id, store.sourceIndex.get('3').id);
+  store.close();
 });
 
-test('題組小題及 Case 刪除後連續遞補，群組 ID 與題目 ID 不變', () => {
-  const s = new Classroom();
-  const group = s.addGroup('第一題組', [{ content: '1-1' }, { content: '1-2', durationSeconds: 90 }, { content: '1-3' }]);
-  assert.deepEqual(group.questions.map(q => q.partNumber), [1, 2, 3]);
-  assert.equal(group.questions[1].durationSeconds, 90);
-  assert.throws(() => s.addGroup('空題組', []), { status: 400 });
-  s.status(group.questions[0].id, 'open');
-  const fourth = s.addPart(group.id, '1-4');
-  assert.equal(fourth.status, 'draft'); assert.equal(group.questions[0].status, 'open');
-  s.remove(group.questions[1].id);
-  assert.equal(group.questions[2].partNumber, 2); assert.equal(fourth.partNumber, 3);
-  const fifth = s.addPart(group.id, '1-4'); assert.equal(fifth.partNumber, 4);
-  assert.deepEqual(s.all().map(q => q.partNumber), [1, 2, 3, 4]);
-  const second = s.add('第二題'); assert.equal(second.caseNumber, 2);
-  s.removeGroup(group.id); assert.equal(s.all().length, 1); assert.equal(second.caseNumber, 1);
-  for (let i = 2; i <= 7; i++) assert.equal(s.add(`第 ${i} 題`).caseNumber, i);
-  assert.deepEqual(s.all().map(q => q.caseNumber), [1, 2, 3, 4, 5, 6, 7]);
-  assert.throws(() => s.get(fourth.id), { status: 404 });
-  s.close();
-});
-
-test('刪除前方 Case 時，開放題與題組保持原 ID、回答和倒數', () => {
-  const s = new Classroom(); const first = s.add('刪除我');
-  const group = s.addGroup('題組', [{ content: '小題' }]);
-  const last = s.add('第三題', 30);
-  s.status(group.questions[0].id, 'open'); s.status(last.id, 'open');
-  submit(s, group.questions[0].id, '001', '題組答案'); submit(s, last.id, '002', '第三題答案');
-  const deadline = last.deadlineMono;
-  s.remove(first.id);
-  assert.equal(group.questions[0].caseNumber, 1); assert.equal(last.caseNumber, 2);
-  assert.equal(s.group(group.id).caseNumber, 1); assert.equal(s.get(last.id), last);
-  assert.equal(last.deadlineMono, deadline); assert.equal(last.submissions.get('002').answer, '第三題答案');
-  assert.equal(s.add('下一題').caseNumber, 3); s.close();
+test('單題與題組衝突時匯入整批拒絕，課堂不部分變更', () => {
+  const store = new Classroom(), sheet = source();
+  store.importQuestions(sheet.grid());
+  sheet.put('C11', '改為題組', '$q_3_1$');
+  sheet.put('G11', '$a_3_1$');
+  sheet.put('C12', '新題', '$q_4$'); sheet.put('G12', '$a_4$');
+  assert.throws(() => store.importQuestions(sheet.grid()), { status: 409 });
+  assert.equal(store.sourceIndex.has('4'), false);
+  assert.equal(store.sourceIndex.get('3').content, '題目 3');
+  store.close();
 });

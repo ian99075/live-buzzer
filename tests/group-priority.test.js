@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Classroom } from '../src/classroom.js';
-import { exportPlan, SheetExporter } from '../src/sheets.js';
-import { fixture, stream, testConfig } from './helpers.js';
+import { fixture, stream } from './helpers.js';
 
-test('學號首次綁定組別；同組成員共享先前第一名次數，結算後順位固定', () => {
+test('學號首次綁定組別；整個題組只計一次先前第一名，結算後順位固定', () => {
   const store = new Classroom();
   assert.equal(store.registerStudent('甲', 2), 2);
   assert.equal(store.registerStudent('甲', 2), 2);
@@ -13,24 +12,23 @@ test('學號首次綁定組別；同組成員共享先前第一名次數，結�
   for (const [id, group] of [['乙', 2], ['丙', 3], ['丁', 4]]) store.registerStudent(id, group);
   const previous = store.addGroup('大題', [{ content: '前題' }, { content: '後題' }]);
   const current = store.add('目前題目');
-  for (const q of [...previous.questions, current]) store.status(q.id, 'open');
-  const submit = (q, id, answer = id) => store.submit(q.id, id, answer, store.studentGroups.get(id));
-  submit(current, '甲'); submit(current, '乙'); submit(current, '丙'); submit(current, '丁');
+  store.groupStatus(previous.id, 'open'); store.status(current.id, 'open');
+  const submit = (id, answer = id) => store.submit(current.id, id, answer, store.studentGroups.get(id));
+  submit('甲'); submit('乙'); submit('丙'); submit('丁');
   assert.deepEqual(store.ranking(current).map(r => store.submissionById(current, r.id).studentNumber), ['甲', '乙', '丙', '丁']);
-  submit(previous.questions[0], '甲'); store.status(previous.questions[0].id, 'settled');
+  store.submitGroup(previous.id, '甲', { '1_1': '一', '1_2': '二' }, 2);
+  store.groupStatus(previous.id, 'settled');
   assert.deepEqual(store.ranking(current).map(r => store.submissionById(current, r.id).studentNumber), ['丙', '丁', '甲', '乙']);
-  submit(previous.questions[1], '乙'); store.status(previous.questions[1].id, 'settled');
-  assert.deepEqual(store.ranking(current).map(r => r.priorWinCount), [0, 0, 2, 2]);
+  assert.deepEqual(store.ranking(current).map(r => r.priorWinCount), [0, 0, 1, 1]);
   store.status(current.id, 'settled'); assert.equal(current.winnerKey, '丙');
   store.disqualify(current.id, current.submissions.get('丙').id); assert.equal(current.winnerKey, '丁');
   store.disqualify(current.id, current.submissions.get('丁').id); assert.equal(current.winnerKey, '甲');
   store.disqualify(current.id, current.submissions.get('甲').id); assert.equal(current.winnerKey, '乙');
   store.disqualify(current.id, current.submissions.get('乙').id); assert.equal(current.winnerKey, null);
-  assert.equal(submit(current, '甲', '重送'), false);
+  assert.equal(submit('甲', '重送'), false);
   assert.equal(new Classroom().studentGroups.size, 0);
   store.close();
 });
-
 test('登入數字組別正規化、409 不洩漏原組別；教師能見各人組別，學生僅能見自己', async t => {
   const f = await fixture(t), teacher = await f.login('teacher');
   const postLogin = (studentNumber, groupNumber) => f.request('/api/student/session', { method: 'POST', body: { studentNumber, groupNumber } });
@@ -79,23 +77,5 @@ test('前題第一名失格後，同組所有人在其他開放題的優先權�
   assert.equal(store.submissionById(current, store.ranking(current)[0].id).studentNumber, '丙');
   store.disqualify(previous.id, previous.submissions.get('甲').id);
   assert.equal(store.submissionById(current, store.ranking(current)[0].id).studentNumber, '乙');
-  store.close();
-});
-
-test('題目編輯後預覽與模擬寫入一致，僅輸出小題內容和第一名組別', async () => {
-  const store = new Classroom(), batches = [];
-  store.registerStudent('00123', 2);
-  const group = store.addGroup('大題標題', [{ content: '原小題' }, { content: '另一小題' }]);
-  const q = group.questions[1]; store.status(q.id, 'open');
-  store.submit(q.id, '00123', '=回答', 2); store.status(q.id, 'settled');
-  const exporter = new SheetExporter(store, testConfig(), async data => { batches.push(structuredClone(data)); });
-  assert.equal(exportPlan(store, '工作表1').items[0].value, '{另一小題}_=回答_G2');
-  await exporter.run();
-  assert.deepEqual(batches[0], [{ range: "'工作表1'!D19", values: [['{另一小題}_=回答_G2']] }]);
-  store.edit(q.id, '已修改小題');
-  assert.equal(exportPlan(store, '工作表1').items[0].value, '{已修改小題}_=回答_G2');
-  await exporter.run();
-  assert.deepEqual(batches[1], [{ range: "'工作表1'!D19", values: [['{已修改小題}_=回答_G2']] }]);
-  assert.equal(store.confirmedCells.get('1:2').value, '{已修改小題}_=回答_G2');
   store.close();
 });

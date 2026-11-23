@@ -13,26 +13,37 @@ test('OpenAPI 路由完整、參照有效、瀏覽器資源可讀且私人資料
   }
   walk(spec);
   const expected = [
-    'POST /api/teacher/session', 'DELETE /api/teacher/session', 'POST /api/student/session', 'GET /api/teacher/questions', 'POST /api/teacher/questions',
+    'POST /api/teacher/session', 'DELETE /api/teacher/session', 'POST /api/student/session', 'GET /api/teacher/questions', 'POST /api/teacher/questions/import-google-sheet',
     'GET /api/teacher/questions/{questionId}', 'PATCH /api/teacher/questions/{questionId}', 'DELETE /api/teacher/questions/{questionId}',
-    'POST /api/teacher/groups', 'PATCH /api/teacher/groups/{groupId}', 'DELETE /api/teacher/groups/{groupId}',
-    'POST /api/teacher/groups/{groupId}/questions', 'POST /api/teacher/questions/{questionId}/convert-to-group',
+    'PATCH /api/teacher/groups/{groupId}', 'DELETE /api/teacher/groups/{groupId}',
+    'POST /api/teacher/groups/{groupId}/start', 'POST /api/teacher/groups/{groupId}/pause',
+    'POST /api/teacher/groups/{groupId}/resume', 'POST /api/teacher/groups/{groupId}/stop',
+    'POST /api/teacher/groups/{groupId}/submissions/{submissionId}/disqualify',
     'POST /api/teacher/questions/{questionId}/start', 'POST /api/teacher/questions/{questionId}/pause',
     'POST /api/teacher/questions/{questionId}/resume', 'POST /api/teacher/questions/{questionId}/stop',
     'POST /api/teacher/questions/{questionId}/submissions/{submissionId}/disqualify',
-    'GET /api/student/questions', 'POST /api/student/questions/{questionId}/buzz', 'POST /api/teacher/exports/google-sheet',
+    'GET /api/student/questions', 'POST /api/student/questions/{questionId}/buzz', 'POST /api/student/groups/{groupId}/buzz',
+    'GET /api/teacher/exports/google-sheet/preview', 'POST /api/teacher/exports/google-sheet',
     'GET /api/teacher/events', 'GET /api/student/events',
   ];
   assert.deepEqual(Object.entries(spec.paths).flatMap(([path, ops]) => Object.keys(ops).map(method => `${method.toUpperCase()} ${path}`)).sort(), expected.sort());
   assert.deepEqual(spec.components.schemas.TeacherQuestion.properties.status.enum, ['draft','open','paused','settled']);
-  assert.deepEqual(spec.components.schemas.StudentQuestion.properties.status.enum, ['open','paused']);
-  assert.equal(spec.components.schemas.CreateQuestion.properties.durationSeconds.maximum, 3600);
-  assert.equal(spec.components.schemas.CreateQuestion.properties.caseNumber, undefined);
-  assert.equal(spec.components.schemas.CreateGroup.properties.caseNumber, undefined);
-  assert.ok(spec.components.schemas.Group.properties.groupId);
+  assert.deepEqual(spec.components.schemas.StudentQuestion.oneOf.map(item => item.$ref),
+    ['#/components/schemas/StudentActiveQuestion', '#/components/schemas/StudentSettledQuestion',
+      '#/components/schemas/StudentActiveGroup', '#/components/schemas/StudentSettledGroup']);
+  assert.deepEqual(spec.components.schemas.StudentActiveQuestion.properties.status.enum, ['open','paused']);
+  assert.equal(spec.components.schemas.StudentActiveQuestion.properties.firstPlace, undefined);
+  assert.equal(spec.components.schemas.StudentSettledQuestion.properties.status.const, 'settled');
+  assert.ok(spec.components.schemas.StudentSettledQuestion.required.includes('firstPlace'));
+  assert.deepEqual(spec.components.schemas.StudentFirstPlace.required, ['studentNumber', 'groupNumber']);
+  assert.equal(spec.components.schemas.StudentFirstPlace.properties.answer, undefined);
+  assert.equal(spec.components.schemas.EditQuestion.properties.durationSeconds.maximum, 3600);
+  assert.deepEqual(spec.components.schemas.EditQuestion.required, ['durationSeconds']);
+  assert.equal(spec.components.schemas.ExportConfirmation.properties.range, undefined);
+  assert.ok(spec.components.schemas.ImportResult.properties.missing);
   assert.ok(spec.components.schemas.TeacherQuestion.properties.groupId);
   assert.ok(spec.components.schemas.TeacherQuestion.properties.partNumber);
-  assert.ok(spec.components.schemas.StudentQuestion.properties.groupTitle);
+  assert.ok(spec.components.schemas.StudentActiveQuestion.properties.groupTitle);
   assert.ok(spec.components.schemas.TeacherSubmission.properties.rank);
   assert.equal(spec.components.schemas.StudentIdentity.properties.groupNumber.type, 'integer');
   assert.equal(spec.components.schemas.StudentIdentity.properties.groupNumber.minimum, 1);
@@ -41,13 +52,20 @@ test('OpenAPI 路由完整、參照有效、瀏覽器資源可讀且私人資料
   assert.ok(spec.components.schemas.StudentSnapshot.properties.groupNumber);
   assert.ok(spec.components.schemas.TeacherSubmission.properties.groupNumber);
   assert.ok(spec.components.schemas.SubmissionIdentity.properties.groupNumber);
-  assert.equal(spec.components.schemas.TeacherQuestion.properties.groupId.anyOf[0].format, 'uuid');
+  assert.equal(spec.components.schemas.TeacherQuestion.properties.groupId.type, 'null');
+  assert.equal(spec.components.schemas.TeacherGroup.properties.groupId.format, 'uuid');
   assert.equal(spec.components.schemas.TeacherSubmission.properties.groupNumber.type, 'integer');
   assert.deepEqual(spec.components.schemas.Buzz.required, ['answer']);
+  assert.deepEqual(spec.components.schemas.GroupBuzz.required, ['answers']);
+  assert.ok(spec.components.schemas.TeacherGroup.properties.parts);
+  assert.deepEqual(spec.components.schemas.Receipt.required, ['received']);
+  assert.equal(spec.components.schemas.Receipt.properties.firstPlace, undefined);
   assert.ok(spec.components.schemas.ExportResult.properties.clearedCount);
-  assert.ok(spec.components.schemas.TeacherSnapshot.properties.exportPlan);
+  assert.equal(spec.components.schemas.TeacherSnapshot.properties.exportPlan, undefined);
+  assert.ok(spec.components.schemas.ExportPreview.properties.token);
   const f = await fixture(t);
-  for (const path of ['/teacher', '/student', '/css/app.css', '/js/teacher.js', '/js/student.js', '/mark.svg']) {
+  for (const path of ['/teacher', '/student', '/css/app.css', '/js/teacher.js', '/js/student.js',
+    '/js/components/group-answer-card.js', '/mark.svg']) {
     const result = await fetch(f.base + path); assert.equal(result.status, 200, path);
     assert.equal(result.headers.get('cache-control'), 'no-store');
   }

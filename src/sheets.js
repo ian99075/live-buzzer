@@ -1,253 +1,198 @@
+import { randomUUID } from 'node:crypto';
 import { HttpError } from './http.js';
-import { coordinateKey } from './classroom.js';
+import { markerText, parseSheetGrid } from './sheet-grid.js';
 
-const markerKey = 'live-buzzer-case';
-const maxInsertedRows = 1000;
+const quoteSheet = name => `'${name.replaceAll("'", "''")}'`;
+const maxResponseBytes = 5_000_000;
 
-export function columnName(index) {
-  if (!Number.isSafeInteger(index) || index < 0) throw new HttpError(400, '小題欄位超出可用範圍。');
-  let result = '';
-  for (let value = index + 1; value > 0; value = Math.floor((value - 1) / 26)) result = String.fromCharCode(65 + (value - 1) % 26) + result;
-  return result;
-}
-export function sheetCoordinate(caseNumber, partNumber = null) {
-  const part = partNumber ?? 1;
-  if (!Number.isSafeInteger(caseNumber) || caseNumber < 1 || caseNumber > Number.MAX_SAFE_INTEGER - 18 ||
-    !Number.isSafeInteger(part) || part < 1 || part > 10000) throw new HttpError(400, 'Case 或小題編號超出可用範圍。');
-  return `${columnName(part + 1)}${18 + caseNumber}`;
-}
-const quoteSheet = sheetName => `'${sheetName.replaceAll("'", "''")}'`;
-const sheetValue = winner => `{${winner.content}}_${winner.answer}_G${winner.groupNumber}`;
-export function sheetData(winners, sheetName) {
-  const sheet = quoteSheet(sheetName);
-  return winners.map(w => ({ range: `${sheet}!${sheetCoordinate(w.caseNumber, w.partNumber)}`,
-    values: [[w.clear ? '' : sheetValue(w)]] }));
-}
-
-function exportTargets(store) {
-  const targets = new Map();
-  for (const confirmed of store.confirmedCells.values()) targets.set(coordinateKey(confirmed.caseNumber, confirmed.partNumber),
-    { caseNumber: confirmed.caseNumber, partNumber: confirmed.partNumber, clear: true, question: null,
-      expectedOldValue: confirmed.value });
-  for (const q of store.all()) {
-    if (q.status !== 'settled') continue;
-    const key = coordinateKey(q.caseNumber, q.partNumber);
-    if (q.winnerKey !== null) {
-      const winner = q.submissions.get(q.winnerKey);
-      targets.set(key, { question: q, caseNumber: q.caseNumber, partNumber: q.partNumber,
-        content: q.content, groupNumber: winner.groupNumber, answer: winner.answer });
-    } else if (targets.has(key)) targets.set(key, { ...targets.get(key), question: q, clear: true });
-  }
-  return [...targets.values()].sort((a,b) => a.caseNumber - b.caseNumber || (a.partNumber ?? 1) - (b.partNumber ?? 1));
-}
-export function exportPlan(store, sheetName) {
-  const targets = exportTargets(store);
-  const data = sheetData(targets, sheetName);
-  return { items: targets.map((target, i) => ({ caseNumber: target.caseNumber, partNumber: target.partNumber,
-    range: data[i].range, clear: !!target.clear, value: data[i].values[0][0],
-    ...(target.clear && target.expectedOldValue !== undefined ? { expectedOldValue: target.expectedOldValue } : {}) })),
-    throughCase: Math.max(6, ...targets.map(t => t.caseNumber)) };
-}
-
-function extractColumn(range) {
-  const cell = range.split('!').at(-1);
-  const letters = cell.match(/^([A-Z]+)[0-9]+$/)?.[1];
-  if (!letters) throw new Error('無效的格位');
-  return [...letters].reduce((n, letter) => n * 26 + letter.charCodeAt(0) - 64, 0) - 1;
-}
-function afterInsertion(merge, at, count) {
-  const m = { ...merge };
-  if (m.startRowIndex >= at) { m.startRowIndex += count; m.endRowIndex += count; }
-  else if (m.endRowIndex > at) m.endRowIndex += count;
-  return m;
-}
-function structureRequests(sheet, metadata, labelRows, items, throughCase) {
-  const sheetId = sheet.properties.sheetId;
-  const rowCount = sheet.properties.gridProperties?.rowCount;
-  const columnCount = sheet.properties.gridProperties?.columnCount;
-  if (!Number.isInteger(rowCount) || !Number.isInteger(columnCount) || rowCount < 25) throw new Error('工作表範圍不正確');
-  if (throughCase - 6 > maxInsertedRows) throw new Error('Case 列數超出安全範圍');
-  for (const item of items) if (extractColumn(item.range) >= columnCount) throw new Error('小題超出工作表欄數');
-  const markers = new Map();
-  for (const entry of metadata) {
-    if (entry.metadataKey !== markerKey || entry.location?.dimensionRange?.sheetId !== sheetId) continue;
-    const caseNumber = Number(entry.metadataValue), range = entry.location.dimensionRange;
-    if (!Number.isSafeInteger(caseNumber) || caseNumber < 7 || range.dimension !== 'ROWS' ||
-      range.endIndex !== range.startIndex + 1 || markers.has(caseNumber)) throw new Error('Case 列標記不一致');
-    markers.set(caseNumber, range.startIndex);
-  }
-  const requests = [];
-  const labeledCases = new Map();
-  for (let i = 0; i < labelRows.length; i++) {
-    const match = String(labelRows[i]).trim().match(/^case\s*([0-9]+)$/i);
-    if (!match) continue;
-    const number = Number(match[1]);
-    if (number >= 7) {
-      if (number !== i + 7 || labeledCases.has(number)) throw new Error('Case 列標籤位置不一致');
-      labeledCases.set(number, i + 24);
-    }
-  }
-  let firstMissing = null;
-  for (let n = 7; n <= throughCase; n++) {
-    const index = 17 + n, marker = markers.get(n), label = labelRows[n - 7] || '';
-    const expectedLabel = `Case ${n}`;
-    if (marker !== undefined && marker !== index) throw new Error('Case 列已移位');
-    if (marker !== undefined && label && !labeledCases.has(n)) throw new Error('Case 列文字與標記不一致');
-    const exists = marker !== undefined || labeledCases.has(n);
-    if (!exists) {
-      if (label) { if (firstMissing !== null) throw new Error('Case 列中有其他內容'); }
-      firstMissing ??= n;
-    } else if (firstMissing !== null) throw new Error('Case 列有缺口，不能安全插列');
-    if (exists && marker === undefined) requests.push({ createDeveloperMetadata: { developerMetadata: {
-      metadataKey: markerKey, metadataValue: String(n), visibility: 'DOCUMENT',
-      location: { dimensionRange: { sheetId, dimension: 'ROWS', startIndex: index, endIndex: index + 1 } },
-    } } });
-    if (exists && !label) requests.push({ updateCells: { range: { sheetId, startRowIndex: index, endRowIndex: index + 1, startColumnIndex: 1, endColumnIndex: 2 },
-      rows: [{ values: [{ userEnteredValue: { stringValue: expectedLabel } }] }], fields: 'userEnteredValue' } });
-  }
-  let insertAt = null, insertCount = 0;
-  if (firstMissing !== null) {
-    if ([...markers.keys(), ...labeledCases.keys()].some(n => n > throughCase)) throw new Error('後續 Case 列已存在，不能安全插列');
-    insertAt = 17 + firstMissing; insertCount = throughCase - firstMissing + 1;
-    if (insertAt > rowCount) throw new Error('Case 列已超出工作表範圍');
-    // 插列先執行；後續所有座標均以插列後的列次表示。
-    requests.unshift({ insertDimension: { range: { sheetId, dimension: 'ROWS', startIndex: insertAt, endIndex: insertAt + insertCount }, inheritFromBefore: true } });
-    if (insertAt + insertCount > rowCount) requests.unshift({ appendDimension: { sheetId, dimension: 'ROWS', length: insertAt + insertCount - rowCount } });
-    for (let n = firstMissing; n <= throughCase; n++) {
-      const index = 17 + n;
-      requests.push({ updateCells: { range: { sheetId, startRowIndex: index, endRowIndex: index + 1, startColumnIndex: 1, endColumnIndex: 2 },
-        rows: [{ values: [{ userEnteredValue: { stringValue: `Case ${n}` } }] }], fields: 'userEnteredValue' } });
-      requests.push({ createDeveloperMetadata: { developerMetadata: { metadataKey: markerKey, metadataValue: String(n), visibility: 'DOCUMENT',
-        location: { dimensionRange: { sheetId, dimension: 'ROWS', startIndex: index, endIndex: index + 1 } } } } });
-    }
-  }
-  const merges = (sheet.merges || []).map(m => insertAt === null ? m : afterInsertion(m, insertAt, insertCount));
-  for (const merge of merges) {
-    if (!items.some(item => { const col = extractColumn(item.range), row = 18 + item.caseNumber - 1;
-      return row >= merge.startRowIndex && row < merge.endRowIndex && col >= merge.startColumnIndex && col < merge.endColumnIndex;
-    })) continue;
-    requests.push({ unmergeCells: { range: merge } });
-  }
-  return requests;
-}
-
-export function createGoogleWriter(config, { fetchImpl = fetch, tokenProvider } = {}) {
+export function createGoogleSheetClient(config, { fetchImpl = fetch, tokenProvider } = {}) {
   let auth;
   const getToken = tokenProvider || (async () => {
     const { GoogleAuth } = await import('google-auth-library');
     auth ||= new GoogleAuth({ keyFile: config.credentialFile, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
     return auth.getAccessToken();
   });
-  async function readCells(items) {
-    if (!items.length) return new Map();
+  async function request(path, method = 'GET', body) {
     if (!config.sheetId || !config.credentialFile) throw new HttpError(503, '尚未設定 Google Sheet ID 或服務帳號憑證。');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.googleTimeoutMs);
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), config.googleTimeoutMs ?? 15000);
     try {
-      const token = await getToken(); controller.signal.throwIfAborted();
-      const query = items.map(item => `ranges=${encodeURIComponent(item.range)}`).join('&');
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(config.sheetId)}/values:batchGet?${query}&valueRenderOption=UNFORMATTED_VALUE`;
-      const response = await fetchImpl(url, { method: 'GET', signal: controller.signal,
-        headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) throw new Error('Google API 回應錯誤');
-      const result = await response.json();
-      if (!Array.isArray(result.valueRanges) || result.valueRanges.length !== items.length) throw new Error('讀回格位數不符');
-      return new Map(items.map((item, index) => [item.range, String(result.valueRanges[index].values?.[0]?.[0] ?? '')]));
-    } catch { throw new HttpError(502, '無法確認 Google Sheet 現有格位，已停止匯出。'); }
-    finally { clearTimeout(timer); }
+      const token = await Promise.race([getToken(), new Promise((_, reject) =>
+        controller.signal.addEventListener('abort', () => reject(new Error('Google 授權逾時')), { once: true }))]);
+      if (!token) throw new Error('無 Google 權杖');
+      const response = await fetchImpl(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(config.sheetId)}${path}`,
+        { method, signal: controller.signal, headers: { Authorization: `Bearer ${token}`,
+          ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      if (!response.ok) throw new Error(`Google API ${response.status}`);
+      if (Number(response.headers?.get?.('content-length') || 0) > maxResponseBytes) throw new Error('Google 回應過大');
+      let raw;
+      if (response.body?.getReader) {
+        const reader = response.body.getReader(), decoder = new TextDecoder();
+        let bytes = 0; raw = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > maxResponseBytes) { await reader.cancel(); throw new Error('Google 回應過大'); }
+          raw += decoder.decode(value, { stream: true });
+        }
+        raw += decoder.decode();
+      } else {
+        raw = await response.text();
+        if (Buffer.byteLength(raw) > maxResponseBytes) throw new Error('Google 回應過大');
+      }
+      return JSON.parse(raw);
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(502, 'Google Sheet 讀寫失敗或逾時，請檢查授權、分頁及網路。');
+    } finally { clearTimeout(timeout); }
   }
-  const write = async (data, plan) => {
-    if (!data.length) return;
-    if (!config.sheetId || !config.credentialFile) throw new HttpError(503, '尚未設定 Google Sheet ID 或服務帳號憑證。');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.googleTimeoutMs);
-    try {
-      const operation = (async () => {
-        const token = await getToken(); controller.signal.throwIfAborted();
-        if (!token) throw new Error('缺少權杖');
-        const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(config.sheetId)}`;
-        async function request(url, method = 'GET', body) {
-          controller.signal.throwIfAborted();
-          const response = await fetchImpl(url, { method, signal: controller.signal,
-            headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-            ...(body ? { body: JSON.stringify(body) } : {}) });
-          if (!response.ok) throw new Error('Google API 回應錯誤');
-          return response.json();
+  return {
+    async readGrid() {
+      const fields = 'sheets(properties(sheetId,title,gridProperties),merges,data(startRow,startColumn,rowData(values(userEnteredValue,formattedValue,note))))';
+      const query = `?ranges=${encodeURIComponent(quoteSheet(config.sheetName))}&includeGridData=true&fields=${encodeURIComponent(fields)}`;
+      const result = await request(query);
+      const sheet = result.sheets?.find(item => item.properties?.title === config.sheetName);
+      if (!sheet) throw new HttpError(502, '找不到設定的 Google Sheet 分頁。');
+      return parseSheetGrid(sheet);
+    },
+    async write(items, grid) {
+      if (!items.length) return;
+      const requests = items.map(item => {
+        const target = grid.answers.get(item.key);
+        if (!target || target.address !== item.address) throw new HttpError(409, '答案格已移動，請重新預覽。');
+        const value = item.value ? { userEnteredValue: { stringValue: item.value } } : {};
+        let fields = 'userEnteredValue';
+        if (!target.inNote) {
+          value.note = [target.note.trim(), markerText('a', item.key)].filter(Boolean).join('\n');
+          fields += ',note';
         }
-        const clearItems = plan?.items.filter(item => item.clear && item.expectedOldValue !== undefined) ?? [];
-        if (clearItems.length) {
-          const current = await readCells(clearItems);
-          for (const item of clearItems) if (current.get(item.range) !== item.expectedOldValue)
-            throw new Error('原格內容已變動，拒絕清空');
-        }
-        if (plan?.items.some(item => item.caseNumber >= 7 || (item.partNumber ?? 1) > 1)) {
-          const fields = encodeURIComponent('sheets(properties(sheetId,title,gridProperties),merges,developerMetadata),developerMetadata');
-          const book = await request(`${base}?fields=${fields}`);
-          const sheet = book.sheets?.find(s => s.properties?.title === config.sheetName);
-          if (!sheet) throw new Error('找不到目標工作表');
-          let labels = [];
-          if (plan.throughCase >= 7) {
-            const throughRow = Math.min(sheet.properties.gridProperties?.rowCount ?? 0, 1018);
-            const range = encodeURIComponent(`${quoteSheet(config.sheetName)}!B25:B${throughRow}`);
-            const result = await request(`${base}/values/${range}?valueRenderOption=FORMATTED_VALUE`);
-            labels = Array.from({ length: throughRow - 24 }, (_, i) => result.values?.[i]?.[0] ?? '');
-          }
-          const metadata = [...(book.developerMetadata || []), ...(sheet.developerMetadata || [])];
-          const seen = new Set();
-          const uniqueMetadata = metadata.filter(entry => { const key = entry.metadataId ?? JSON.stringify(entry);
-            if (seen.has(key)) return false; seen.add(key); return true; });
-          const requests = structureRequests(sheet, uniqueMetadata, labels, plan.items, plan.throughCase);
-          if (requests.length) await request(`${base}:batchUpdate`, 'POST', { requests });
-        }
-        const result = await request(`${base}/values:batchUpdate`, 'POST', { valueInputOption: 'RAW', data });
-        if (result.totalUpdatedCells !== data.length) throw new Error('未確認全部儲存格');
-      })();
-      await Promise.race([operation, new Promise((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('逾時')), { once: true }))]);
-    } catch {
-      throw new HttpError(502, 'Google 寫入失敗或無法確認結構與格位。請檢查工作表後重試。');
-    } finally { clearTimeout(timer); }
+        return { updateCells: { range: { sheetId: grid.sheetId, startRowIndex: target.row,
+          endRowIndex: target.row + 1, startColumnIndex: target.column, endColumnIndex: target.column + 1 },
+          rows: [{ values: [value] }], fields } };
+      });
+      const result = await request(':batchUpdate', 'POST', { requests });
+      if (!Array.isArray(result.replies) || result.replies.length !== requests.length)
+        throw new HttpError(502, 'Google 寫入回應不完整，需讀回確認。');
+    },
   };
-  write.readCells = readCells;
-  return write;
+}
+
+function targets(store) {
+  const chosen = new Map([...store.confirmedCells].map(([key]) => [key, { key, clear: true, value: '' }]));
+  for (const entity of store.competitions()) {
+    if (entity.status !== 'settled' || entity.winnerKey === null) continue;
+    const winner = entity.submissions.get(entity.winnerKey);
+    if (entity.kind === 'group') {
+      for (const id of entity.questionIds) {
+        const part = store.get(id);
+        if (part.sourceKey) chosen.set(part.sourceKey, { key: part.sourceKey, clear: false,
+          value: `${winner.answers[part.sourceKey]}_G${winner.groupNumber}` });
+      }
+    } else if (entity.sourceKey) {
+      chosen.set(entity.sourceKey, { key: entity.sourceKey, clear: false,
+        value: `${winner.answer}_G${winner.groupNumber}` });
+    }
+  }
+  return [...chosen.values()].sort((a,b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+}
+
+function plan(store, grid) {
+  return targets(store).map(item => {
+    const cell = grid.answers.get(item.key);
+    if (!cell) throw new HttpError(409, `找不到 $a_${item.key}$ 的答案格，請檢查工作表備註。`);
+    const confirmed = store.confirmedCells.get(item.key);
+    if (confirmed && cell.value !== confirmed.value)
+      throw new HttpError(409, `${cell.address} 已由他人修改，請先核對工作表。`);
+    return { ...item, address: cell.address, range: `${quoteSheet(grid.title)}!${cell.address}`,
+      oldValue: cell.value, oldNote: cell.note };
+  });
+}
+
+function previewDigest(store, items) {
+  const competitions = store.competitions().map(entity => {
+    const winner = entity.winnerKey === null ? null : entity.submissions.get(entity.winnerKey);
+    return {
+      id: entity.id, status: entity.status,
+      keys: entity.kind === 'group' ? entity.questionIds.map(id => store.get(id).sourceKey) : [entity.sourceKey],
+      winnerKey: entity.winnerKey,
+      winningSubmissionId: winner?.id ?? null,
+      winningAnswers: winner ? entity.kind === 'group' ? winner.answers : winner.answer : null,
+    };
+  });
+  return JSON.stringify({ items, competitions });
 }
 
 export class SheetExporter {
-  constructor(store, config, writer, onChange = () => {}) { Object.assign(this, { store, config, writer, onChange }); }
-  async run() {
-    this.store.unlocked(); this.store.settleDue();
-    this.store.exporting = true;
-    this.onChange();
+  constructor(store, config, client, onChange = () => {}) {
+    Object.assign(this, { store, config, client, onChange });
+    this.previews = new Map();
+  }
+  async importQuestions() {
+    this.store.unlocked(); this.store.exporting = true; this.onChange();
     try {
-      if (this.store.ambiguousBatch) {
-        if (typeof this.writer.readCells !== 'function') throw new HttpError(502, '上次匯出結果未確認，需讀回 Google Sheet 後才能重試。');
-        const previous = this.store.ambiguousBatch;
-        const actual = await this.writer.readCells(previous);
-        for (const item of previous) if (actual.get(item.range) === item.value) {
-          const key = coordinateKey(item.caseNumber, item.partNumber);
-          if (item.clear) this.store.confirmedCells.delete(key);
-          else this.store.confirmedCells.set(key, { caseNumber: item.caseNumber, partNumber: item.partNumber, value: item.value });
-        }
-        this.store.ambiguousBatch = null;
+      const grid = await this.client.readGrid();
+      const result = this.store.importQuestions(grid);
+      this.store.onChange(); return result;
+    } finally { this.store.exporting = false; this.onChange(); }
+  }
+  async reconcile() {
+    if (!this.store.ambiguousBatch) return;
+    const pending = this.store.ambiguousBatch, grid = await this.client.readGrid();
+    const allWritten = pending.items.every(item => {
+      const cell = grid.answers.get(item.key);
+      return cell?.address === item.address && cell.value === item.value && cell.inNote;
+    });
+    const allOriginal = pending.items.every(item => {
+      const cell = grid.answers.get(item.key);
+      return cell?.address === item.address && cell.value === item.oldValue && cell.note === item.oldNote;
+    });
+    if (!allWritten && !allOriginal) throw new HttpError(409, '前次寫入結果不明，請核對答案格與備註後再試。');
+    if (allWritten) this.commit(pending.items);
+    this.store.ambiguousBatch = null;
+  }
+  commit(items) {
+    for (const item of items) {
+      if (item.clear) this.store.confirmedCells.delete(item.key);
+      else this.store.confirmedCells.set(item.key, { value: item.value });
+      const q = this.store.sourceIndex.get(item.key);
+      if (q) q.confirmedExport = !item.clear;
+    }
+  }
+  async preview(teacherToken) {
+    this.store.unlocked(); this.store.settleDue();
+    this.store.exporting = true; this.onChange();
+    try {
+      await this.reconcile();
+      const grid = await this.client.readGrid(), items = plan(this.store, grid);
+      const token = randomUUID(), digest = previewDigest(this.store, items), expiresAt = Date.now() + 120000;
+      this.previews.set(token, { teacherToken, digest, expiresAt });
+      if (this.previews.size > 100) for (const [key, preview] of this.previews)
+        if (preview.expiresAt <= Date.now() || this.previews.size > 100) this.previews.delete(key);
+      return { token, items, expiresAt, sheetName: grid.title, testMode: this.config.testMode === true };
+    } finally { this.store.exporting = false; this.onChange(); }
+  }
+  async run(token, teacherToken) {
+    this.store.unlocked();
+    const preview = this.previews.get(token);
+    if (!preview || preview.teacherToken !== teacherToken || preview.expiresAt <= Date.now())
+      throw new HttpError(409, '匯出預覽已過期，請重新開啟。');
+    this.previews.delete(token);
+    this.store.settleDue(); this.store.exporting = true; this.onChange();
+    try {
+      await this.reconcile();
+      const grid = await this.client.readGrid(), items = plan(this.store, grid);
+      if (previewDigest(this.store, items) !== preview.digest) throw new HttpError(409, '題目結果或 Sheet 格位已改變，請重新預覽。');
+      if (items.length) {
+        this.store.ambiguousBatch = { items };
+        await this.client.write(items, grid);
+        const written = await this.client.readGrid();
+        if (!items.every(item => written.answers.get(item.key)?.address === item.address &&
+          written.answers.get(item.key)?.value === item.value && written.answers.get(item.key)?.inNote))
+          throw new HttpError(502, 'Google 寫入後讀回不一致，請核對後重試。');
+        this.commit(items); this.store.ambiguousBatch = null;
       }
-      const targets = exportTargets(this.store), plan = exportPlan(this.store, this.config.sheetName);
-      const data = sheetData(targets, this.config.sheetName);
-      if (data.length) {
-        this.store.ambiguousBatch = plan.items.map(item => ({ ...item }));
-        await this.writer(data, plan);
-      }
-      for (const [index, target] of targets.entries()) {
-        if (target.question) target.question.confirmedExport = !target.clear;
-        const key = coordinateKey(target.caseNumber, target.partNumber);
-        if (target.clear) this.store.confirmedCells.delete(key);
-        else this.store.confirmedCells.set(key, { caseNumber: target.caseNumber, partNumber: target.partNumber,
-          value: data[index].values[0][0] });
-      }
-      this.store.ambiguousBatch = null;
-      return { writtenCount: data.length, clearedCount: targets.filter(target => target.clear).length,
-        ranges: data.map(d => d.range), testMode: this.config.testMode === true };
-    } catch (error) {
-      if (error instanceof HttpError) throw error;
-      throw new HttpError(502, '未能確認寫入成功，請稍後重試。');
+      return { writtenCount: items.length, clearedCount: items.filter(item => item.clear).length,
+        ranges: items.map(item => item.range), testMode: this.config.testMode === true };
     } finally { this.store.exporting = false; this.onChange(); }
   }
 }

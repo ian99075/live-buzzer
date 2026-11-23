@@ -11,6 +11,9 @@ export function answerCard(initial, { expired, isCurrent }) {
   const inputHint = element('small', 'answer-hint', '請先填寫回答（1–5000 字），再按「搶答！」。');
   const button = element('button', 'buzz-button', '搶答！'); button.type = 'submit';
   const feedback = element('p', 'message'); feedback.setAttribute('role', 'status');
+  const result = element('div', 'student-result'); result.setAttribute('role', 'status'); result.setAttribute('aria-live', 'polite');
+  const resultLabel = element('p', 'student-result-label', '搶答第一名');
+  const resultIdentity = element('strong', 'student-result-identity'); result.append(resultLabel, resultIdentity);
   const dialog = element('dialog', 'answer-confirm');
   const heading = element('h2', '', '確認送出這份回答？');
   const questionPreview = element('p', 'confirm-question');
@@ -19,14 +22,26 @@ export function answerCard(initial, { expired, isCurrent }) {
   const actions = element('div', 'control-actions');
   const cancel = element('button', '', '返回修改'), confirm = element('button', 'primary', '確認送出');
   cancel.type = confirm.type = 'button'; actions.append(cancel, confirm); dialog.append(heading, questionPreview, preview, hint, actions);
-  root.append(tag, groupTitle, title, timer, label, input, inputHint, button, feedback, dialog);
+  root.append(tag, groupTitle, title, timer, label, input, inputHint, button, feedback, result, dialog);
   const remaining = () => q.status === 'open' ? Math.max(0, q.deadlineAt - (Date.now() - clockOffset)) : q.remainingMs;
   const canSend = () => q.status === 'open' && remaining() > 0 && online && isCurrent();
   function render() {
     tag.textContent = `CASE ${q.caseNumber}${q.partNumber ? `-${q.partNumber}` : ''}`;
     groupTitle.textContent = q.groupTitle || ''; groupTitle.hidden = !q.groupTitle;
-    title.textContent = q.content; root.dataset.state = state;
+    title.textContent = q.content; root.dataset.state = q.status === 'settled' ? 'settled' : state;
     const active = canSend();
+    const settled = q.status === 'settled';
+    for (const control of [timer, label, input, inputHint, button, feedback]) control.hidden = settled;
+    result.hidden = !settled;
+    if (settled) {
+      resultLabel.hidden = !q.firstPlace;
+      const identity = q.firstPlace
+        ? `學號 ${q.firstPlace.studentNumber} · G${q.firstPlace.groupNumber}` : '尚無搶答第一名';
+      if (resultIdentity.textContent !== identity) resultIdentity.textContent = identity;
+      input.disabled = true; button.disabled = true;
+      if (dialog.open) dialog.close();
+      return;
+    }
     timer.textContent = q.status === 'paused' ? `已暫停 · 剩餘 ${Math.ceil(q.remainingMs / 1000)} 秒`
       : `剩餘 ${Math.floor(Math.ceil(remaining() / 1000) / 60)}:${String(Math.ceil(remaining() / 1000) % 60).padStart(2, '0')}`;
     input.disabled = state !== 'editable' || !active;

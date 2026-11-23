@@ -17,3 +17,16 @@
 .student-heading #identity-number{font-size:17px;font-weight:800;line-height:1.4;overflow-wrap:anywhere}
 .student-heading #identity-group{display:inline-flex;align-items:center;justify-content:center;min-width:48px;padding:5px 11px;border-radius:9px;background:#dfece2;color:#174e44;font-size:18px;font-weight:850;line-height:1.2}
 @media(max-width:560px){.student-heading{align-items:flex-start}.student-heading .identity{max-width:60%}.student-heading #identity-number{font-size:15px}.student-heading #identity-group{font-size:16px}}
+.student-result{margin-top:22px;padding:20px 22px;border:1px solid #cfe3d4;border-radius:14px;background:#edf5ee;overflow-wrap:anywhere}
+.student-result-label{margin:0 0 8px;color:var(--green);font-size:13px;font-weight:750;letter-spacing:.5px}
+.student-result-identity{display:block;color:#174e44;font-size:25px;font-weight:800;line-height:1.5}
+.answer-card[data-state="settled"]{border-color:#d2e0d4}
+.group-answer-fields{display:grid;gap:18px;margin:20px 0}.group-answer-part{border-top:1px solid var(--line);padding-top:12px;min-width:0}.group-answer-part label{font-size:16px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}.group-answer-part textarea{min-height:100px}.group-answer-preview{max-height:40vh;overflow:auto;display:grid;gap:12px}.group-answer-preview-item{background:#f7f8f4;padding:12px;border-radius:9px;overflow-wrap:anywhere}.group-answer-preview-item p{white-space:pre-wrap;margin:8px 0 0}.group-response-list{border-top:1px solid var(--line);margin-top:24px;padding-top:22px;display:grid;gap:14px}.group-submission-answer{border-top:1px solid var(--line);margin-top:12px;padding-top:10px;overflow-wrap:anywhere}.group-submission-answer strong{font-size:14px}.group-submission-answer .answer-text{font-size:16px}.group-control>.status-tag{display:inline-block;margin:14px 0 9px}.group-control>.question-timer{display:block;margin:4px 0 14px}.group-control>.control-actions{margin:12px 0}.group-control>.winner{margin:20px 0 0}.group-control .leader-student-number{font-size:20px}@media(max-width:560px){.group-answer-fields{gap:14px}.group-control>.control-actions button{flex:1 1 44%}.group-response-list{margin-top:20px}.group-submission-answer .answer-text{font-size:15px}}
+@media(max-width:560px){.student-result{padding:17px}.student-result-identity{font-size:21px}}
+#waiting:not([hidden]) + #answer-list:not(:empty){margin-top:28px}
+@media(max-width:560px){#waiting:not([hidden]) + #answer-list:not(:empty){margin-top:20px}}
+.group-control .question-editor{display:grid;gap:12px;min-width:0;padding-top:10px}
+.group-control .question-editor label{margin:0}
+.group-control .question-editor input{display:block;min-width:0;max-width:100%}
+.group-control .question-editor .control-actions{margin-top:4px;gap:10px}
+.group-control .question-editor .control-actions button{min-width:80px}

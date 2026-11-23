@@ -3,7 +3,7 @@
   "info": {
     "title": "課堂即時搶答 API",
     "version": "1.0.0",
-    "description": "單一 Node.js 程序、記憶體狀態、無資料庫。所有端點同源。寫入要求 application/json；body 上限 64 KiB，未列出的欄位被拒絕。沒有瀏覽器 Origin 的客戶端仍須登入。所有回應 no-store，不記錄學生答案或憑證。重啟不從 Sheet 恢復課堂。"
+    "description": "單一 Node.js 程序、記憶體狀態、無資料庫。所有端點同源。寫入要求 application/json；一般 body 上限 64 KiB、題組回答上限 5 MB，未列出的欄位被拒絕。沒有瀏覽器 Origin 的客戶端仍須登入。所有回應 no-store，不記錄學生答案或憑證。重啟不從 Sheet 恢復課堂。"
   },
   "servers": [
     {
@@ -78,7 +78,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -165,7 +165,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -275,7 +275,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -361,222 +361,12 @@
             }
           }
         }
-      },
-      "post": {
-        "operationId": "createQuestion",
-        "summary": "後端自動編號新增單題 Case（不會立即開放）",
-        "tags": [
-          "teacher"
-        ],
-        "security": [
-          {
-            "teacherCookie": []
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeacherQuestion"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "跨來源寫入被拒絕",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "題目狀態不符或正在匯出，請稍後再試",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "超過 64 KiB body 上限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "必須為 application/json",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "伺服器錯誤（不透露內部資訊）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateQuestion"
-              }
-            }
-          }
-        }
       }
     },
-    "/api/teacher/groups": {
+    "/api/teacher/questions/import-google-sheet": {
       "post": {
-        "operationId": "createGroup",
-        "summary": "後端自動編號建立題組與草稿小題",
-        "tags": [
-          "teacher"
-        ],
-        "security": [
-          {
-            "teacherCookie": []
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Group"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "跨來源寫入被拒絕",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "題目狀態不符或正在匯出，請稍後再試",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "超過 64 KiB body 上限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "必須為 application/json",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "伺服器錯誤（不透露內部資訊）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateGroup"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/teacher/groups/{groupId}": {
-      "patch": {
-        "operationId": "editGroup",
-        "summary": "修改題組標題",
+        "operationId": "importQuestions",
+        "summary": "從設定的 Google Sheet 備註增量匯入題目",
         "tags": [
           "teacher"
         ],
@@ -591,7 +381,134 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Group"
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "無法確認 Google Sheet 讀寫成功；重試前會讀回可疑格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "尚未提供 Google 設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "description": "q 鍵只從題目格備註讀取；格式錯誤時不修改課堂。既有開放或結算題保留，草稿只更新題目文字。"
+      }
+    },
+    "/api/teacher/groups/{groupId}": {
+      "patch": {
+        "operationId": "editGroupDuration",
+        "summary": "修改草稿題組共用倒數秒數",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherGroup"
                 }
               }
             }
@@ -647,7 +564,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -682,7 +599,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EditGroup"
+                "$ref": "#/components/schemas/EditQuestion"
               }
             }
           }
@@ -765,7 +682,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -801,133 +718,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Empty"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "in": "path",
-            "name": "groupId",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
-      }
-    },
-    "/api/teacher/groups/{groupId}/questions": {
-      "post": {
-        "operationId": "addGroupQuestion",
-        "summary": "在題組末尾追加草稿小題",
-        "tags": [
-          "teacher"
-        ],
-        "security": [
-          {
-            "teacherCookie": []
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeacherQuestion"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "跨來源寫入被拒絕",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "找不到題目、題組或 API",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "題目狀態不符或正在匯出，請稍後再試",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "超過 64 KiB body 上限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "必須為 application/json",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "伺服器錯誤（不透露內部資訊）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePart"
               }
             }
           }
@@ -1013,7 +803,7 @@
       },
       "patch": {
         "operationId": "editQuestion",
-        "summary": "修改題目文字；草稿可修改倒數秒數",
+        "summary": "僅修改草稿題目的倒數秒數",
         "tags": [
           "teacher"
         ],
@@ -1084,7 +874,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1138,7 +928,7 @@
       },
       "delete": {
         "operationId": "deleteQuestion",
-        "summary": "刪題並遞補後續編號，不立即更動 Sheet",
+        "summary": "刪題但保留其他題目的來源編號",
         "tags": [
           "teacher"
         ],
@@ -1202,7 +992,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1255,137 +1045,10 @@
         ]
       }
     },
-    "/api/teacher/questions/{questionId}/convert-to-group": {
-      "post": {
-        "operationId": "convertQuestionToGroup",
-        "summary": "保留原題狀態並轉為 1-1",
-        "tags": [
-          "teacher"
-        ],
-        "security": [
-          {
-            "teacherCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Group"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "跨來源寫入被拒絕",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "找不到題目、題組或 API",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "題目狀態不符或正在匯出，請稍後再試",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "超過 64 KiB body 上限",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "必須為 application/json",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "伺服器錯誤（不透露內部資訊）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EditGroup"
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "in": "path",
-            "name": "questionId",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ]
-      }
-    },
     "/api/student/questions": {
       "get": {
         "operationId": "studentQuestions",
-        "summary": "僅取得開放或暫停題目及自己的提交狀態",
+        "summary": "取得開放、暫停與已結算單題／題組；僅結算後公開第一名",
         "tags": [
           "student"
         ],
@@ -1482,7 +1145,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1522,7 +1185,7 @@
             }
           }
         },
-        "description": "首次有效回答由伺服器同步接受並記錄順序；重送、截止、暫停、失格或不存在的題目一律回相同的 202 收件格式，不透露排名或得標資訊。學生端確認彈窗僅為 UI，無額外 API。",
+        "description": "僅供單題。首次有效回答由伺服器同步接受並記錄順序；重送、截止、暫停或失格一律回相同的 202 收件格式，不透露排名或第一名資訊。",
         "parameters": [
           {
             "in": "path",
@@ -1536,10 +1199,194 @@
         ]
       }
     },
+    "/api/student/groups/{groupId}/buzz": {
+      "post": {
+        "operationId": "buzzGroup",
+        "summary": "一次提交整組所有小題回答，不回傳勝負",
+        "tags": [
+          "student"
+        ],
+        "security": [
+          {
+            "studentCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupBuzz"
+              }
+            }
+          }
+        },
+        "description": "answers 必須恰含目前題組所有 sourceKey，整份原子接受；同學號重送、到期或已結算仍回固定 202。",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/teacher/exports/google-sheet/preview": {
+      "get": {
+        "operationId": "previewExport",
+        "summary": "讀取實際答案佔位符格位並建立短期確認 token",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "無法確認 Google Sheet 讀寫成功；重試前會讀回可疑格",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "尚未提供 Google 設定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/teacher/exports/google-sheet": {
       "post": {
         "operationId": "exportWinners",
-        "summary": "覆寫已結算有效第一名，必要時清空舊值",
+        "summary": "依確認 token 覆寫已結算有效第一名，必要時清空舊值",
         "tags": [
           "teacher"
         ],
@@ -1600,7 +1447,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1630,7 +1477,7 @@
             }
           },
           "502": {
-            "description": "無法確認 Google 格位或寫入成功；可能已寫入，重試前會讀回可疑格",
+            "description": "無法確認 Google Sheet 讀寫成功；重試前會讀回可疑格",
             "content": {
               "application/json": {
                 "schema": {
@@ -1655,12 +1502,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Empty"
+                "$ref": "#/components/schemas/ExportConfirmation"
               }
             }
           }
         },
-        "description": "只快照已結算單題／小題。Case N 的 N-1 或單題寫第 18+N 列 C 欄，N-2 為 D 欄，以 RAW 寫入「{題目}_回答_G組別編號」，不含學號。Case 7+ 首次匯出時視需要插列，既有列不重複新增。刪題後按新編號覆寫，已確認的舊座標清空；清空前確認未被人工改動。寫入回應遺失後，下一次匯出先讀回可疑格。匯出期間教師修改回 409。"
+        "description": "重新讀取目前答案鍵與課堂結果，與預覽不同回 409。首次寫入同批將 a 鍵保存至原格備註；值為純文字「回答_G組別編號」。不插列、不猜測座標。"
       }
     },
     "/api/teacher/questions/{questionId}/start": {
@@ -1737,7 +1584,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1865,7 +1712,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1993,7 +1840,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -2121,7 +1968,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -2166,6 +2013,514 @@
           {
             "in": "path",
             "name": "questionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/teacher/groups/{groupId}/start": {
+      "post": {
+        "operationId": "startGroup",
+        "summary": "整組開始倒數",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到題目、題組或 API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/teacher/groups/{groupId}/pause": {
+      "post": {
+        "operationId": "pauseGroup",
+        "summary": "暫停整組倒數",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到題目、題組或 API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/teacher/groups/{groupId}/resume": {
+      "post": {
+        "operationId": "resumeGroup",
+        "summary": "繼續整組倒數",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到題目、題組或 API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/teacher/groups/{groupId}/stop": {
+      "post": {
+        "operationId": "stopGroup",
+        "summary": "結算整組並固定唯一第一名",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到題目、題組或 API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
             "required": true,
             "schema": {
               "type": "string",
@@ -2249,7 +2604,7 @@
             }
           },
           "413": {
-            "description": "超過 64 KiB body 上限",
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -2312,6 +2667,142 @@
         ]
       }
     },
+    "/api/teacher/groups/{groupId}/submissions/{submissionId}/disqualify": {
+      "post": {
+        "operationId": "disqualifyGroupSubmission",
+        "summary": "取消整份題組回答資格並遞補",
+        "tags": [
+          "teacher"
+        ],
+        "security": [
+          {
+            "teacherCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeacherGroup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON、必要欄位、額外欄位或文字長度錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入、角色不符、工作階段失效或教師憑證錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "跨來源寫入被拒絕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "找不到題目、題組或 API",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "題目狀態不符或正在匯出，請稍後再試",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "一般請求超過 64 KiB，或題組整組送出超過 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "必須為 application/json",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "伺服器錯誤（不透露內部資訊）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "path",
+            "name": "submissionId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
     "/api/teacher/events": {
       "get": {
         "operationId": "teacherEvents",
@@ -2326,13 +2817,13 @@
         ],
         "responses": {
           "200": {
-            "description": "每次連線先送完整 snapshot，資料為 TeacherSnapshot JSON。重連重新取得完整快照。不提供事件 id。15 秒固定 heartbeat 註解；過期送 auth-required / {} 並關閉。學生僅因自己的提交或可見題目變更收到快照，不能看到其他學號、回答、總人數或勝負。慢連線只保留最新快照。",
+            "description": "每次連線先送完整 snapshot，資料為 TeacherSnapshot JSON。重連重新取得完整快照。不提供事件 id。15 秒固定 heartbeat 註解；過期送 auth-required / {} 並關閉。學生可在結算後看到該題有效第一名的學號與組別；開放中不見暫定第一名，任何時候都不見他人回答、候選順位或總人數。慢連線只保留最新快照。",
             "content": {
               "text/event-stream": {
                 "schema": {
                   "type": "string"
                 },
-                "example": "retry: 1500\n\nevent: snapshot\ndata: {\"serverNow\":0,\"questions\":[],\"exporting\":false,\"sheetName\":\"工作表1\",\"testMode\":false}\n\n: heartbeat\n\nevent: auth-required\ndata: {}\n\n"
+                "example": "retry: 1500\n\nevent: snapshot\ndata: {\"serverNow\":0,\"questions\":[],\"exporting\":false,\"sheetName\":\"學習單\",\"testMode\":false}\n\n: heartbeat\n\nevent: auth-required\ndata: {}\n\n"
               }
             },
             "x-snapshot-schema": {
@@ -2376,7 +2867,7 @@
         ],
         "responses": {
           "200": {
-            "description": "每次連線先送完整 snapshot，資料為 StudentSnapshot JSON。重連重新取得完整快照。不提供事件 id。15 秒固定 heartbeat 註解；過期送 auth-required / {} 並關閉。學生僅因自己的提交或可見題目變更收到快照，不能看到其他學號、回答、總人數或勝負。慢連線只保留最新快照。",
+            "description": "每次連線先送完整 snapshot，資料為 StudentSnapshot JSON。重連重新取得完整快照。不提供事件 id。15 秒固定 heartbeat 註解；過期送 auth-required / {} 並關閉。學生可在結算後看到該題有效第一名的學號與組別；開放中不見暫定第一名，任何時候都不見他人回答、候選順位或總人數。慢連線只保留最新快照。",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -2500,137 +2991,64 @@
           }
         }
       },
-      "CreateQuestion": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "content"
-        ],
-        "properties": {
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000,
-            "description": "去除前後空白後 1–2000 個 Unicode 字元，不接受全空白。"
-          },
-          "durationSeconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3600,
-            "default": 60,
-            "description": "每題倒數秒數，僅草稿可修改。"
-          }
-        }
-      },
-      "CreatePart": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "content"
-        ],
-        "properties": {
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000,
-            "description": "去除前後空白後 1–2000 個 Unicode 字元，不接受全空白。"
-          },
-          "durationSeconds": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 3600,
-            "default": 60,
-            "description": "每題倒數秒數，僅草稿可修改。"
-          }
-        }
-      },
-      "CreateGroup": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "title",
-          "parts"
-        ],
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          },
-          "parts": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "#/components/schemas/CreatePart"
-            }
-          }
-        }
-      },
-      "EditGroup": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "title"
-        ],
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          }
-        }
-      },
-      "Group": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "groupId",
-          "caseNumber",
-          "title",
-          "questions"
-        ],
-        "properties": {
-          "groupId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "caseNumber": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740973
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          },
-          "questions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TeacherQuestion"
-            }
-          }
-        }
-      },
       "EditQuestion": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "content"
+          "durationSeconds"
         ],
         "properties": {
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000,
-            "description": "去除前後空白後 1–2000 個 Unicode 字元，不接受全空白。"
-          },
           "durationSeconds": {
             "type": "integer",
             "minimum": 1,
             "maximum": 3600,
             "default": 60,
-            "description": "每題倒數秒數，僅草稿可修改。"
+            "description": "單題或整組倒數秒數，僅草稿可修改。"
+          }
+        }
+      },
+      "ExportConfirmation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "ImportResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "added",
+          "updated",
+          "retained",
+          "missing"
+        ],
+        "properties": {
+          "added": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retained": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       },
@@ -2675,6 +3093,32 @@
             "minLength": 1,
             "maxLength": 5000,
             "description": "去除前後空白後 1–5000 個 Unicode 字元；保留內部換行。"
+          }
+        }
+      },
+      "GroupAnswers": {
+        "type": "object",
+        "minProperties": 1,
+        "propertyNames": {
+          "pattern": "^[1-9][0-9]*_[1-9][0-9]*$"
+        },
+        "additionalProperties": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "description": "去除前後空白後 1–5000 個 Unicode 字元；保留內部換行。"
+        },
+        "description": "必須恰好包含目前題組每個小題的 sourceKey，少一題、多一題或空白回答均拒絕。"
+      },
+      "GroupBuzz": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "answers"
+        ],
+        "properties": {
+          "answers": {
+            "$ref": "#/components/schemas/GroupAnswers"
           }
         }
       },
@@ -2778,6 +3222,128 @@
           }
         }
       },
+      "GroupSubmissionIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "studentNumber",
+          "groupNumber",
+          "answers"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "studentNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "去除前後空白，保留前導零；以字串處理。"
+          },
+          "groupNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "學生組別編號；畫面以 G 加編號顯示。"
+          },
+          "answers": {
+            "$ref": "#/components/schemas/GroupAnswers"
+          }
+        }
+      },
+      "TeacherGroupSubmission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "studentNumber",
+          "groupNumber",
+          "answers",
+          "acceptedAt",
+          "acceptedOrder",
+          "priorWinCount",
+          "rank",
+          "disqualified"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "studentNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "去除前後空白，保留前導零；以字串處理。"
+          },
+          "groupNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "學生組別編號；畫面以 G 加編號顯示。"
+          },
+          "answers": {
+            "$ref": "#/components/schemas/GroupAnswers"
+          },
+          "acceptedAt": {
+            "type": "number"
+          },
+          "acceptedOrder": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "priorWinCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disqualified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GroupPart": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sourceKey",
+          "partNumber",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "partNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "去除前後空白後 1–2000 個 Unicode 字元，不接受全空白。"
+          }
+        }
+      },
       "Receipt": {
         "type": "object",
         "additionalProperties": false,
@@ -2796,11 +3362,13 @@
         "additionalProperties": false,
         "required": [
           "id",
+          "kind",
           "groupId",
           "caseNumber",
           "partNumber",
           "groupTitle",
           "content",
+          "sourceKey",
           "durationSeconds",
           "status",
           "deadlineAt",
@@ -2815,16 +3383,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "kind": {
+            "const": "single"
+          },
           "groupId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "null"
           },
           "caseNumber": {
             "type": "integer",
@@ -2832,27 +3395,10 @@
             "maximum": 9007199254740973
           },
           "partNumber": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "null"
           },
           "groupTitle": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "null"
           },
           "content": {
             "type": "string",
@@ -2860,12 +3406,23 @@
             "maxLength": 2000,
             "description": "去除前後空白後 1–2000 個 Unicode 字元，不接受全空白。"
           },
+          "sourceKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "durationSeconds": {
             "type": "integer",
             "minimum": 1,
             "maximum": 3600,
             "default": 60,
-            "description": "每題倒數秒數，僅草稿可修改。"
+            "description": "單題或整組倒數秒數，僅草稿可修改。"
           },
           "status": {
             "type": "string",
@@ -2930,11 +3487,164 @@
           }
         }
       },
-      "StudentQuestion": {
+      "TeacherGroup": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "id",
+          "groupId",
+          "kind",
+          "caseNumber",
+          "groupTitle",
+          "title",
+          "parts",
+          "durationSeconds",
+          "status",
+          "deadlineAt",
+          "remainingMs",
+          "submissions",
+          "provisionalLeader",
+          "winner",
+          "clearPending"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "group"
+          },
+          "caseNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740973
+          },
+          "groupTitle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupPart"
+            }
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600,
+            "default": 60,
+            "description": "單題或整組倒數秒數，僅草稿可修改。"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "paused",
+              "settled"
+            ]
+          },
+          "deadlineAt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remainingMs": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeacherGroupSubmission"
+            }
+          },
+          "provisionalLeader": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupSubmissionIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupSubmissionIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clearPending": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TeacherCompetition": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TeacherQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/TeacherGroup"
+          }
+        ]
+      },
+      "StudentFirstPlace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "studentNumber",
+          "groupNumber"
+        ],
+        "properties": {
+          "studentNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "去除前後空白，保留前導零；以字串處理。"
+          },
+          "groupNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "學生組別編號；畫面以 G 加編號顯示。"
+          }
+        }
+      },
+      "StudentActiveQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
           "caseNumber",
           "partNumber",
           "groupTitle",
@@ -2949,33 +3659,19 @@
             "type": "string",
             "format": "uuid"
           },
+          "kind": {
+            "const": "single"
+          },
           "caseNumber": {
             "type": "integer",
             "minimum": 1,
             "maximum": 9007199254740973
           },
           "partNumber": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "null"
           },
           "groupTitle": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "type": "null"
           },
           "content": {
             "type": "string",
@@ -3018,34 +3714,248 @@
           }
         }
       },
-      "ExportItem": {
+      "StudentSettledQuestion": {
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "id",
+          "kind",
           "caseNumber",
           "partNumber",
-          "range",
-          "clear",
-          "value"
+          "groupTitle",
+          "content",
+          "status",
+          "deadlineAt",
+          "remainingMs",
+          "submitted",
+          "firstPlace"
         ],
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "single"
+          },
           "caseNumber": {
             "type": "integer",
             "minimum": 1,
             "maximum": 9007199254740973
           },
           "partNumber": {
+            "type": "null"
+          },
+          "groupTitle": {
+            "type": "null"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "去除前後空白後 1–2000 個 Unicode 字元，不接受全空白。"
+          },
+          "status": {
+            "type": "string",
+            "const": "settled"
+          },
+          "deadlineAt": {
+            "type": "null"
+          },
+          "remainingMs": {
+            "type": "number",
+            "const": 0
+          },
+          "submitted": {
+            "type": "boolean",
+            "description": "僅此學號是否曾有效提交，不代表勝負。"
+          },
+          "firstPlace": {
             "anyOf": [
               {
-                "type": "integer",
-                "minimum": 1
+                "$ref": "#/components/schemas/StudentFirstPlace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "StudentActiveGroup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "groupId",
+          "kind",
+          "caseNumber",
+          "groupTitle",
+          "parts",
+          "status",
+          "deadlineAt",
+          "remainingMs",
+          "submitted"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "group"
+          },
+          "caseNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740973
+          },
+          "groupTitle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupPart"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "paused"
+            ]
+          },
+          "deadlineAt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
               },
               {
                 "type": "null"
               }
             ]
           },
-          "range": {
+          "remainingMs": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submitted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StudentSettledGroup": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "groupId",
+          "kind",
+          "caseNumber",
+          "groupTitle",
+          "parts",
+          "status",
+          "deadlineAt",
+          "remainingMs",
+          "submitted",
+          "firstPlace"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "group"
+          },
+          "caseNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740973
+          },
+          "groupTitle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupPart"
+            }
+          },
+          "status": {
+            "const": "settled"
+          },
+          "deadlineAt": {
+            "type": "null"
+          },
+          "remainingMs": {
+            "type": "number",
+            "const": 0
+          },
+          "submitted": {
+            "type": "boolean"
+          },
+          "firstPlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentFirstPlace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "StudentQuestion": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StudentActiveQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/StudentSettledQuestion"
+          },
+          {
+            "$ref": "#/components/schemas/StudentActiveGroup"
+          },
+          {
+            "$ref": "#/components/schemas/StudentSettledGroup"
+          }
+        ]
+      },
+      "ExportItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "clear",
+          "value",
+          "address",
+          "range",
+          "oldValue",
+          "oldNote"
+        ],
+        "properties": {
+          "key": {
             "type": "string",
             "minLength": 1
           },
@@ -3055,30 +3965,52 @@
           "value": {
             "type": "string"
           },
-          "expectedOldValue": {
+          "address": {
             "type": "string",
-            "description": "僅清空已確認的舊格時提供；寫入前會讀回確認沒有被手動修改。"
+            "minLength": 1
+          },
+          "range": {
+            "type": "string",
+            "minLength": 1
+          },
+          "oldValue": {
+            "type": "string"
+          },
+          "oldNote": {
+            "type": "string"
           }
         }
       },
-      "ExportPlan": {
+      "ExportPreview": {
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "token",
           "items",
-          "throughCase"
+          "expiresAt",
+          "sheetName",
+          "testMode"
         ],
         "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1
+          },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ExportItem"
             }
           },
-          "throughCase": {
-            "type": "integer",
-            "minimum": 6,
-            "description": "Case 7+ 的列可能需首次插入；實際結構由匯出時 Google 現況決定。"
+          "expiresAt": {
+            "type": "number"
+          },
+          "sheetName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "testMode": {
+            "type": "boolean"
           }
         }
       },
@@ -3090,8 +4022,7 @@
           "questions",
           "exporting",
           "sheetName",
-          "testMode",
-          "exportPlan"
+          "testMode"
         ],
         "properties": {
           "serverNow": {
@@ -3101,7 +4032,7 @@
           "questions": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TeacherQuestion"
+              "$ref": "#/components/schemas/TeacherCompetition"
             }
           },
           "exporting": {
@@ -3114,9 +4045,6 @@
           "testMode": {
             "type": "boolean",
             "description": "正式服務固定 false；測試 fixture 才會 true。"
-          },
-          "exportPlan": {
-            "$ref": "#/components/schemas/ExportPlan"
           }
         }
       },

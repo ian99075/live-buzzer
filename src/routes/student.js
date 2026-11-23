@@ -16,6 +16,14 @@ export function studentRoute({ req, res, path, body, store, sessions, events }) 
   if (path === '/api/student/questions' && req.method === 'GET') {
     json(res, 200, studentSnapshot(store, studentNumber, groupNumber)); return;
   }
+  const groupMatch = path.match(/^\/api\/student\/groups\/([a-zA-Z0-9-]+)\/buzz$/);
+  if (groupMatch && req.method === 'POST') {
+    fields(body, ['answers']);
+    const changed = store.submitGroup(groupMatch[1], studentNumber, body.answers, groupNumber);
+    json(res, 202, { received: true });
+    if (changed) events.publish(studentNumber);
+    return;
+  }
   const match = path.match(/^\/api\/student\/questions\/([a-zA-Z0-9-]+)\/buzz$/);
   if (match && req.method === 'POST') {
     fields(body, ['answer']);

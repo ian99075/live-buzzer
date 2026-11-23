@@ -23,20 +23,7 @@ export function questionControls(initial, callbacks) {
   const content = element('p', 'question-text'); const actions = element('div', 'control-actions');
   const timer = element('strong', 'question-timer');
   const toggle = element('button', 'primary'); const pause = element('button', '', '暫停'); const stop = element('button', '', '提早結算');
-  const edit = element('button', '', '編輯'); const remove = element('button', 'danger', '刪除');
-  const groupActions = element('div', 'control-actions group-actions');
-  const convert = element('button', '', '轉為題組');
-  const groupForm = element('form', 'group-editor'); groupForm.hidden = true;
-  const groupLabel = element('label'); const groupInput = element('input'); groupInput.maxLength = 2000;
-  const groupSubmit = element('button', 'primary', '儲存'); groupSubmit.type = 'submit';
-  const groupCancel = element('button', '', '取消'); groupCancel.type = 'button'; groupCancel.onclick = () => { groupForm.hidden = true; };
-  const groupFeedback = element('p', 'message'); groupFeedback.setAttribute('role', 'status');
-  groupForm.append(groupLabel, groupInput, groupSubmit, groupCancel, groupFeedback);
-  function showGroupForm() {
-    if (locked || busy) return;
-    groupForm.hidden = false; message(groupFeedback);
-    groupLabel.textContent = '題組標題'; groupInput.value = q.content; groupInput.focus();
-  }
+  const edit = element('button', '', '設定秒數'); const remove = element('button', 'danger', '刪除');
   const feedback = element('p', 'message'); feedback.setAttribute('role', 'status');
   const editor = questionEditor(q, callbacks);
   function render() {
@@ -50,10 +37,7 @@ export function questionControls(initial, callbacks) {
     timer.textContent = q.status === 'open' ? '' : q.status === 'settled' ? '倒數結束' : `設定 ${q.status === 'draft' ? q.durationSeconds : Math.ceil(q.remainingMs / 1000)} 秒`;
     if (q.status !== 'open') delete timer.dataset.deadlineAt;
     for (const button of [toggle, pause, stop, edit, remove]) button.disabled = locked || busy;
-    for (const button of [convert, groupSubmit, groupCancel]) button.disabled = locked || busy;
-    convert.hidden = !!q.partNumber;
-    groupActions.hidden = !!q.partNumber;
-    if (q.partNumber) groupForm.hidden = true;
+    edit.hidden = q.status !== 'draft';
     editor.lock(locked || busy);
   }
   async function run(path, method = 'POST') {
@@ -67,19 +51,6 @@ export function questionControls(initial, callbacks) {
   stop.onclick = () => run(`/api/teacher/questions/${q.id}/stop`);
   edit.onclick = () => editor.open(q);
   remove.onclick = async () => { if (await confirmDelete(q.caseNumber, q.partNumber)) await run(`/api/teacher/questions/${q.id}`, 'DELETE'); };
-  convert.onclick = showGroupForm;
-  groupForm.onsubmit = async event => {
-    event.preventDefault(); if (locked || busy) return;
-    const value = groupInput.value.trim();
-    if (!value || [...value].length > 2000) { message(groupFeedback, '請輸入 1–2000 字的題組標題。', true); return; }
-    busy = true; render(); message(groupFeedback);
-    try {
-      await api(`/api/teacher/questions/${q.id}/convert-to-group`, { method: 'POST', body: { title: value } });
-      groupForm.hidden = true; await callbacks.updated();
-    } catch (error) { message(groupFeedback,error.message,true); callbacks.failed(error); }
-    finally { busy = false; render(); }
-  };
-  groupActions.append(convert);
-  actions.append(toggle, pause, stop, edit, remove); root.append(top, groupHeading, content, timer, actions, groupActions, groupForm, editor.form, feedback); render();
+  actions.append(toggle, pause, stop, edit, remove); root.append(top, groupHeading, content, timer, actions, editor.form, feedback); render();
   return { root, update(value, exportLock) { q = value; locked = exportLock; render(); } };
 }

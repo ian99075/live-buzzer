@@ -50,30 +50,35 @@ test('慢速 SSE 連線不累積中間快照，恢復後取得最新完整狀態
   res.destroy(); assert.equal(f.events.clients.size, 0);
 });
 
-test('SSE 單題轉組保留學生提交狀態，草稿小題不洩漏回答', async t => {
+test('SSE 題組整組提交與開始後增量匯入衝突不洩漏回答', async t => {
   const f = await fixture(t); const teacher = await f.login('teacher'); const student = await f.login('student', '00123');
-  const q = await f.question(teacher);
-  await f.request(`/api/student/questions/${q.id}/buzz`, { method: 'POST', cookie: student, body: { answer: '原答案' } });
+  f.sheet.put('C5', '第一小題', '$q_1_1$'); f.sheet.put('H5', '$a_1_1$');
+  await f.request('/api/teacher/questions/import-google-sheet', { method: 'POST', cookie: teacher });
+  const q = (await f.request('/api/teacher/questions', { cookie: teacher })).data.questions[0];
+  f.sheet.put('C6', '第二小題', '$q_1_2$'); f.sheet.put('H6', '$a_1_2$');
+  await f.request('/api/teacher/questions/import-google-sheet', { method: 'POST', cookie: teacher });
+  await f.request(`/api/teacher/groups/${q.id}/start`, { method: 'POST', cookie: teacher });
+  await f.request(`/api/student/groups/${q.id}/buzz`, { method: 'POST', cookie: student,
+    body: { answers: { '1_1': '原答案', '1_2': '第二答案' } } });
   const ts = await stream(f.base, 'teacher', teacher), ss = await stream(f.base, 'student', student);
   t.after(async () => { await Promise.all([ts.close(), ss.close()]); });
   await Promise.all([ts.next(), ss.next()]);
-  const converted = await f.request(`/api/teacher/questions/${q.id}/convert-to-group`, { method: 'POST', cookie: teacher,
-    body: { title: '公開標題' } });
-  const tView = await ts.next(), sView = await ss.next();
-  assert.equal(tView.data.questions[0].submissions[0].answer, '原答案');
-  assert.equal(sView.data.questions[0].id, q.id); assert.equal(sView.data.questions[0].submitted, true);
-  assert.equal(sView.data.questions[0].groupTitle, '公開標題');
-  assert.equal(sView.raw.includes('原答案'), false); assert.equal(sView.raw.includes('winner'), false);
-  await f.request(`/api/teacher/groups/${converted.data.groupId}/questions`, { method: 'POST', cookie: teacher, body: { content: '新草稿' } });
-  assert.equal((await ts.next()).data.questions.length, 2);
+  f.sheet.put('C7', '第三小題', '$q_1_3$'); f.sheet.put('H7', '$a_1_3$');
+  assert.equal((await f.request('/api/teacher/questions/import-google-sheet', { method: 'POST', cookie: teacher })).status, 409);
+  const tView = (await f.request('/api/teacher/questions', { cookie: teacher })).data;
+  const sView = (await f.request('/api/student/questions', { cookie: student })).data;
+  assert.equal(tView.questions[0].submissions[0].answers['1_1'], '原答案');
+  assert.equal(sView.questions[0].id, q.id); assert.equal(sView.questions[0].submitted, true);
+  assert.equal(sView.questions[0].groupTitle, '題組 1');
+  assert.equal(JSON.stringify(sView).includes('原答案'), false); assert.equal(JSON.stringify(sView).includes('winner'), false);
+  assert.equal(tView.questions[0].parts.length, 2);
   assert.equal((await f.request('/api/student/questions', { cookie: student })).data.questions.length, 1);
 });
 
-test('教師登出立即關閉其 SSE，其他教師與學生繼續接收改號快照', async t => {
+test('教師登出立即關閉其 SSE，其他教師與學生繼續接收固定題號快照', async t => {
   const f = await fixture(t), teacher = await f.login('teacher');
   const otherTeacher = await f.login('teacher'), student = await f.login('student', '00123');
-  const first = await f.question(teacher), second = await f.question(teacher);
-  await f.request(`/api/teacher/questions/${second.id}/start`, { method: 'POST', cookie: teacher });
+  const first = await f.question(teacher, 1), second = await f.question(teacher, 2);
   const a = await stream(f.base, 'teacher', teacher), b = await stream(f.base, 'teacher', otherTeacher);
   const s = await stream(f.base, 'student', student);
   t.after(async () => { await Promise.all([a.close(), b.close(), s.close()]); });
@@ -81,10 +86,10 @@ test('教師登出立即關閉其 SSE，其他教師與學生繼續接收改號�
   await f.request('/api/teacher/session', { method: 'DELETE', cookie: teacher });
   assert.equal((await a.next()).event, 'auth-required');
   await f.request(`/api/teacher/questions/${first.id}`, { method: 'DELETE', cookie: otherTeacher });
-  assert.equal((await b.next()).data.questions[0].caseNumber, 1);
-  const studentView = await s.next();
-  assert.equal(studentView.data.questions[0].id, second.id);
-  assert.equal(studentView.data.questions[0].caseNumber, 1);
-  assert.equal(studentView.raw.includes('groupId'), false);
-  assert.equal(studentView.raw.includes('winner'), false);
+  assert.equal((await b.next()).data.questions[0].caseNumber, 2);
+  await delay(30);
+  const studentView = (await f.request('/api/student/questions', { cookie: student })).data;
+  assert.equal(studentView.questions[0].id, second.id);
+  assert.equal(studentView.questions[0].caseNumber, 2);
+  assert.equal(JSON.stringify(studentView).includes('winner'), false);
 });

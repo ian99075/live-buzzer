@@ -6,23 +6,25 @@ import { readConfig } from './config.js';
 import { Classroom } from './classroom.js';
 import { Sessions } from './auth.js';
 import { Events } from './events.js';
-import { createGoogleWriter, SheetExporter } from './sheets.js';
+import { createGoogleSheetClient, SheetExporter } from './sheets.js';
 import { HttpError, headers, json, bodyJson } from './http.js';
 import { teacherRoute } from './routes/teacher.js';
 import { studentRoute } from './routes/student.js';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
-export function createApp({ config, store = new Classroom(), sessions = new Sessions(config), writer, heartbeatMs } = {}) {
+export function createApp({ config, store = new Classroom(), sessions = new Sessions(config), sheetClient, heartbeatMs } = {}) {
   const events = new Events(store, sessions, config, heartbeatMs);
   store.setOnChange(() => events.publish());
-  const exporter = new SheetExporter(store, config, writer || createGoogleWriter(config), () => events.teachers());
+  const exporter = new SheetExporter(store, config, sheetClient || createGoogleSheetClient(config), () => events.teachers());
   const server = createServer(async (req, res) => {
     headers(res);
     try {
       const path = new URL(req.url, 'http://localhost').pathname;
       if (path.startsWith('/api/')) {
-        const body = ['POST', 'PATCH', 'DELETE'].includes(req.method) ? await bodyJson(req, config) : undefined;
+        const groupBuzz = /^\/api\/student\/groups\/[^/]+\/buzz$/.test(path);
+        const body = ['POST', 'PATCH', 'DELETE'].includes(req.method)
+          ? await bodyJson(req, config, groupBuzz ? 5_000_000 : 65536, groupBuzz) : undefined;
         store.settleDue();
         const ctx = { req, res, path, body, store, sessions, events, exporter, config };
         if (path.startsWith('/api/teacher/')) { await teacherRoute(ctx); return; }

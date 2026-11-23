@@ -1,5 +1,5 @@
 import { fields, HttpError, json, textValue } from '../http.js';
-import { teacherQuestion, teacherSnapshot } from '../projections.js';
+import { teacherQuestion, teacherGroup, teacherSnapshot } from '../projections.js';
 
 export async function teacherRoute(ctx) {
   const { req, res, path, body, store, sessions, events, exporter, config } = ctx;
@@ -18,59 +18,55 @@ export async function teacherRoute(ctx) {
     json(res, 204); return;
   }
   if (path === '/api/teacher/events' && req.method === 'GET') { events.attach(req, res, 'teacher', auth); return; }
+  if (path === '/api/teacher/questions/import-google-sheet' && req.method === 'POST') {
+    fields(body, []); json(res, 200, await exporter.importQuestions()); return;
+  }
+  if (path === '/api/teacher/exports/google-sheet/preview' && req.method === 'GET') {
+    json(res, 200, await exporter.preview(auth.token)); return;
+  }
   if (path === '/api/teacher/exports/google-sheet' && req.method === 'POST') {
-    fields(body, []); json(res, 200, await exporter.run()); return;
-  }
-  if (path === '/api/teacher/groups' && req.method === 'POST') {
-    fields(body, ['title', 'parts'], ['title', 'parts']);
-    const group = store.addGroup(body.title, body.parts);
-    json(res, 201, { groupId: group.id, caseNumber: group.caseNumber, title: group.title,
-      questions: group.questions.map(q => teacherQuestion(q, store)) }); events.publish(); return;
-  }
-  const groupQuestion = path.match(/^\/api\/teacher\/groups\/([a-f0-9-]{36})\/questions$/);
-  if (groupQuestion && req.method === 'POST') {
-    fields(body, ['content', 'durationSeconds'], ['content']);
-    const q = store.addPart(groupQuestion[1], body.content, body.durationSeconds);
-    json(res, 201, teacherQuestion(q, store)); events.publish(); return;
+    fields(body, ['token'], ['token']); json(res, 200, await exporter.run(body.token, auth.token)); return;
   }
   const groupMatch = path.match(/^\/api\/teacher\/groups\/([a-f0-9-]{36})$/);
   if (groupMatch) {
     const groupId = groupMatch[1];
     if (req.method === 'PATCH') {
-      fields(body, ['title']);
-      const group = store.renameGroup(groupId, body.title);
-      json(res, 200, { groupId, caseNumber: group.caseNumber, title: group.title,
-        questions: group.questionIds.map(id => teacherQuestion(store.get(id), store)) }); events.publish(); return;
+      fields(body, ['durationSeconds'], ['durationSeconds']);
+      json(res, 200, teacherGroup(store.editGroupDuration(groupId, body.durationSeconds), store)); events.publish(); return;
     }
     if (req.method === 'DELETE') {
       fields(body, []); store.removeGroup(groupId); json(res, 204); events.publish(); return;
     }
   }
+  const groupDisqualify = path.match(/^\/api\/teacher\/groups\/([a-f0-9-]{36})\/submissions\/([a-zA-Z0-9-]+)\/disqualify$/);
+  if (groupDisqualify && req.method === 'POST') {
+    fields(body, []); json(res, 200, teacherGroup(store.disqualifyGroup(groupDisqualify[1], groupDisqualify[2]), store));
+    events.publish(); return;
+  }
+  const groupAction = path.match(/^\/api\/teacher\/groups\/([a-f0-9-]{36})\/(start|pause|resume|stop)$/);
+  if (groupAction && req.method === 'POST') {
+    fields(body, []);
+    const state = { start: 'open', pause: 'paused', resume: 'open', stop: 'settled' }[groupAction[2]];
+    json(res, 200, teacherGroup(store.groupStatus(groupAction[1], state), store)); events.publish(); return;
+  }
   if (path === '/api/teacher/questions') {
     if (req.method === 'GET') { json(res, 200, teacherSnapshot(store, config)); return; }
-    if (req.method === 'POST') {
-      fields(body, ['content', 'durationSeconds'], ['content']);
-      const q = store.add(body.content, body.durationSeconds);
-      json(res, 201, teacherQuestion(q, store)); events.publish(); return;
-    }
   }
   const disqualify = path.match(/^\/api\/teacher\/questions\/([a-zA-Z0-9-]+)\/submissions\/([a-zA-Z0-9-]+)\/disqualify$/);
   if (disqualify && req.method === 'POST') {
     fields(body, []); json(res, 200, teacherQuestion(store.disqualify(disqualify[1], disqualify[2]), store));
     events.publish(); return;
   }
-  const convert = path.match(/^\/api\/teacher\/questions\/([a-zA-Z0-9-]+)\/convert-to-group$/);
-  if (convert && req.method === 'POST') {
-    fields(body, ['title']); const group = store.convertToGroup(convert[1], body.title);
-    json(res, 200, { groupId: group.id, caseNumber: group.caseNumber, title: group.title,
-      questions: group.questionIds.map(id => teacherQuestion(store.get(id), store)) }); events.publish(); return;
-  }
   const match = path.match(/^\/api\/teacher\/questions\/([a-zA-Z0-9-]+)(?:\/(start|pause|resume|stop))?$/);
   if (match) {
     const [, id, action] = match;
-    if (!action && req.method === 'GET') { json(res, 200, teacherQuestion(store.get(id), store)); return; }
+    if (!action && req.method === 'GET') {
+      const q = store.get(id);
+      if (q.partNumber !== null) throw new HttpError(409, '請從題組查看整組回答。');
+      json(res, 200, teacherQuestion(q, store)); return;
+    }
     if (!action && req.method === 'PATCH') {
-      fields(body, ['content', 'durationSeconds'], ['content']); json(res, 200, teacherQuestion(store.edit(id, body.content, body.durationSeconds), store)); events.publish(); return;
+      fields(body, ['durationSeconds'], ['durationSeconds']); json(res, 200, teacherQuestion(store.editDuration(id, body.durationSeconds), store)); events.publish(); return;
     }
     if (!action && req.method === 'DELETE') {
       fields(body, []); store.remove(id); json(res, 204); events.publish(); return;

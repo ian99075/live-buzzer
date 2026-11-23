@@ -2,26 +2,26 @@ schema: spec-driven
 
 context: |
   Language: zh-TW
-  專案：單一課堂即時線上搶答系統。教師以設定的帳密登入，學生以字串學號與正整數組別編號免密碼登入；教師控制題目、查看所有回答並手動匯出，學生只能看題目、倒數、自身組別與自己的送出狀態。
+  專案：單一課堂即時線上搶答系統。教師以設定的帳密登入，學生以字串學號與正整數組別編號免密碼登入；教師控制題目、查看所有回答並手動匯出，學生看題目、倒數、自身送出狀態及已結算題目的搶答第一名學號與 G 組別。
   文件使用繁體中文；保留 OpenSpec 結構標題及 SHALL/MUST 等規範關鍵字。
 
   技術與目錄：Node.js 24+、JavaScript ES modules、原生 node:http、REST 與 SSE；前端為原生 HTML/CSS/JavaScript modules，沒有框架或建置步驟。唯一直接執行期依賴為 google-auth-library。
-  public/ 放靜態前端及 components；src/ 放 server、config、routes、auth、classroom、projections、events、sheets；tests/ 使用 node:test 與 node:assert/strict；docs/openapi.json 是 OpenAPI 3.1 合約，docs/ 也保存驗收紀錄。
+  public/ 放靜態前端及 components；src/ 放 server、config、routes、auth、classroom、projections、events、sheet-grid、sheets；tests/ 使用 node:test 與 node:assert/strict；docs/openapi.json 是 OpenAPI 3.1 合約，docs/ 也保存驗收紀錄。
   JavaScript 沿用既有兩格縮排、單引號、分號及 .js 副檔名的相對 import；前後端以具名匯出及小型模組組織。新增行為先沿用現有架構，API 變更須同步 scripts/openapi.mjs 與 docs/openapi.json。
 
   課堂狀態：無資料庫或本地課堂資料檔，只存在單一 Node 程序記憶體中；重啟或 npm run dev 自動重載會清空題目、回答及登入。不得以 cluster、多副本或多實例 serverless 部署現有裁決。
-  Case 由後端從 1 起連續自動編號，可為單題或含 1-1、1-2 等獨立小題的題組；刪除前面的 Case 或小題會遞補後續編號，但題目 UUID、題組 groupId、計時和回答不變；開放中單題可轉為題組並保留原題 ID、計時與回答。多題／多小題可獨立倒數、暫停與結算。每題每學號只保存首次有效回答；學號首次登入後在本次服務運行期間固定組別，輸入 2 顯示 G2，組別 02 亦正規化為 G2；更換組別須拒絕但不洩漏原組別。開放時先比同組在其他已結算題目的有效搶答第一名次數（每小題各計一次），再比本題伺服器接受順序；結算後固定順位與唯一搶答第一名，失格時由有效候補遞補。同組不同學號各自保留回答。截止、去重及接受順序的關鍵區段不得加入 await。
-  教師可見全部回答、各人學號與 G 組別及暫定順位；學生 API/SSE 僅提供公開題目、自身組別與自身 submitted，不回傳他人學號、組別、回答、人數、勝負或名次。學生按搶答後須確認才送出；202 received=true 不代表搶答第一名。
-  Google 匯出由教師手動觸發；服務帳號呼叫 Google Sheets API。Case N 在第 18+N 列；單題或該 Case 的第 1 小題寫 C 欄，第 2 小題寫 D 欄，後續小題逐欄向右。Case 7+ 缺列時先插入並以 developer metadata 標記，重試先讀既有列，避免重複插入。僅解除與輸出格衝突的合併。以 RAW 覆寫已結算有效搶答第一名，每格精確為 `{單題或小題完整內容}_回答_G組別編號`，不含學號。記憶體帳本保留已確認格位；刪題遞補後，下一次手動匯出覆寫新座標並清空不再使用的舊格。清空前讀回確認未被人工修改；寫入回應遺失時，下一次先讀回可疑格，不能確認就安全報錯。不得加入 Apps Script 或任意前端指定範圍。
+  題目只從設定的 Google Sheet 匯入：題目格備註的 $q_N$ 或 $q_N_M$ 是穩定來源鍵，答案格文字或備註有配對的 $a_N$ 或 $a_N_M$。Case／小題編號按來源鍵，不因刪除而遞補；同一 Case 不混用單題與題組。題組標題為「題組 N」。重匯只更新草稿文字，保留教師設定秒數與已開始題目的狀態、回答；缺失來源鍵不自動刪除。單題各自倒數與結算；一個題組的全部小題共用一次倒數、暫停、提交與結算。題組開始後鎖定小題集合，新小題造成整次重匯衝突；不得單刪已開始題組的小題，可刪整組。學生須填妥每個小題，經一次確認送出完整 answers；同一單題／題組每學號只保存首次有效提交。學號首次登入後在本次服務運行期間固定組別，輸入 2 顯示 G2，組別 02 亦正規化為 G2；更換組別須拒絕但不洩漏原組別。開放時先比同組在其他已結算且仍有效的單題／整個題組搶答第一名次數（整組只計一次），再比伺服器接受順序；結算後固定順位與唯一搶答第一名，失格時整份提交由有效候補遞補。同組不同學號各自保留完整回答。截止、去重及接受順序的關鍵區段不得加入 await。
+  教師可見全部回答、各人學號與 G 組別及暫定順位；學生 API/SSE 在題目開放或暫停時僅提供公開題目、自身組別與自身 submitted，已結算題目另提供當下有效搶答第一名的學號與 G 組別或空狀態。不回傳他人回答、開放中暫定順位、提交人數或失格名單。學生按搶答後須確認才送出；202 received=true 不代表搶答第一名。
+  Google 匯出由教師手動預覽並確認；服務帳號呼叫 Google Sheets API。每次從目前答案佔位符格值或備註定位，不按固定座標、插列或解除合併。首次寫入時用 Sheets batchUpdate 同批將答案鍵保留到原格備註，格值為純文字 `回答_G組別編號`，不含題目或學號。題組選出一位整組第一名，再把其各小題回答分別寫入對應 a 鍵；失格候補時整組覆寫，全員失格或刪整組時下次手動匯出清空本堂課已匯出的各格。教師預覽得到短期 token，確認時重讀 Sheet 格位與課堂第一名；異動須重新預覽。記憶體帳本只保留本次服務已確認的鍵與值；清空前讀回確認未被人工修改；寫入回應遺失時，下一次先讀回可疑格，不能確認就安全報錯。重啟後不自動清空舊答案。不得加入 Apps Script 或任意前端指定範圍。
 
   API 與安全：JSON 請求以明確欄位白名單驗證，HttpError 對應統一狀態碼與安全訊息；角色工作階段與 SSE 投影分離。教師右上角登出會撤銷目前 token、過期 Cookie 並立即關閉該 token 的 SSE，其他登入與課堂資料保留。文字顯示使用 textContent，即時更新保留未儲存草稿與焦點。
-  環境變數以大寫底線命名；TEACHER_USERNAME、TEACHER_PASSWORD、HOST、PORT、APP_ORIGIN、COOKIE_SECURE、GOOGLE_SHEET_ID、GOOGLE_SHEET_NAME、GOOGLE_APPLICATION_CREDENTIALS 的範例見 .env.example。
+  環境變數以大寫底線命名；TEACHER_USERNAME、TEACHER_PASSWORD、HOST、PORT、APP_ORIGIN、COOKIE_SECURE、GOOGLE_SHEET_ID、GOOGLE_SHEET_NAME、GOOGLE_APPLICATION_CREDENTIALS 的範例見 .env.example。目前目標試算表 ID 為 1X7YNIcyvPMsbUnTuBdJ5lwmkZmIHj2-wO-S7CdpEwo0，工作表名稱為「學習單」；實際執行仍以環境設定為準。
   本機預設只監聽 127.0.0.1；教室區域網路使用時，HOST 設為 0.0.0.0，APP_ORIGIN 設為師生共同使用的主機 IP 與埠網址，並確認防火牆允許連線。區域網路功能已有使用者驗收；公開 HTTPS 部署須另行驗收，不將兩者混為同一項證據。
   不將 .env、credentials/、私鑰、存取權杖或真實密碼加入公開目錄、文件、錯誤或日誌；不覆蓋使用者既有設定。
 
   開發與驗證：npm ci 安裝；npm start 啟動正式服務；npm run dev 會自動重載並清空記憶體；npm run preview:test 使用隔離的模擬服務，不讀正式憑證或連線 Google。
-  npm test 使用合成資料、可注入時鐘與模擬 Google writer，不需正式憑證；必要時補實際瀏覽器驗收。只有獲授權的指定格可做真實 Google 寫入驗收，並依約還原。修改 API 後重新產生 OpenAPI 並執行合約測試。
-  OpenSpec 主規格位於 openspec/specs/，完成的歷史變更保存在 openspec/changes/archive/。新增需求先判斷是否屬於進行中的 change：若是，先修訂其 Proposal／Design／Specs／Tasks，再 Apply；若不是，建立新 change。實作後依序 Verify、同步主規格及歸檔，不把 Apply 完成視為整個流程結束。真實學籍／組員身分驗證、持久化與公開部署需另行確認。
+  npm test 使用合成資料、可注入時鐘與模擬 Google Sheet client，不需正式憑證；必要時補實際瀏覽器驗收。只有獲授權的指定格可做真實 Google 寫入驗收，並依約還原。修改 API 後重新產生 OpenAPI 並執行合約測試。
+  OpenSpec 主規格位於 openspec/specs/，完成的歷史變更保存在 openspec/changes/archive/。新增需求先判斷是否屬於進行中的 change：若是，先修訂其 Proposal／Design／Specs／Tasks，再 Apply；若不是，建立新 change。已歸檔的 change 保留作為歷史紀錄，後續需求另開 change，不回頭改寫歸檔文件。實作後依序 Verify、同步主規格及歸檔，不把 Apply 完成視為整個流程結束。真實學籍／組員身分驗證、持久化與公開部署需另行確認。
 
 rules:
   proposal:

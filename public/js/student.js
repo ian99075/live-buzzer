@@ -1,6 +1,7 @@
 import { api, connection, message, validText } from './api.js';
 import { connectEvents } from './events.js';
 import { answerCard } from './components/answer-card.js';
+import { groupAnswerCard } from './components/group-answer-card.js';
 
 const $ = selector => document.querySelector(selector);
 const cards = new Map(); let closeEvents, online = false, generation = 0, clockOffset = 0, snapshot = { questions: [] };
@@ -19,12 +20,13 @@ function render() {
   snapshot.questions.forEach((q, index) => {
     if (!cards.has(q.id)) {
       const current = generation;
-      cards.set(q.id, answerCard(q, { expired, isCurrent: () => current === generation && cards.has(q.id) }));
+      cards.set(q.id, (q.kind === 'group' ? groupAnswerCard : answerCard)(q,
+        { expired, isCurrent: () => current === generation && cards.has(q.id) }));
     }
     const card = cards.get(q.id); card.update(q, online, clockOffset);
     if ($('#answer-list').children[index] !== card.root) $('#answer-list').insertBefore(card.root, $('#answer-list').children[index] || null);
   });
-  $('#waiting').hidden = snapshot.questions.length > 0;
+  $('#waiting').hidden = snapshot.questions.some(q => q.status === 'open' || q.status === 'paused');
 }
 function apply(value) {
   snapshot = value; clockOffset = Date.now() - value.serverNow;

@@ -12,7 +12,7 @@ export function readConfig(env = process.env) {
     port, host: env.HOST || '127.0.0.1', origin: origin.origin,
     teacherUsername: env.TEACHER_USERNAME.trim(), teacherPassword: env.TEACHER_PASSWORD,
     secureCookie: env.COOKIE_SECURE === 'true', sessionMs: 12 * 60 * 60 * 1000,
-    sheetId: env.GOOGLE_SHEET_ID || '', sheetName: env.GOOGLE_SHEET_NAME || '工作表1',
+    sheetId: env.GOOGLE_SHEET_ID || '1X7YNIcyvPMsbUnTuBdJ5lwmkZmIHj2-wO-S7CdpEwo0', sheetName: env.GOOGLE_SHEET_NAME || '學習單',
     credentialFile: env.GOOGLE_APPLICATION_CREDENTIALS || '', googleTimeoutMs: 15000,
   };
 }

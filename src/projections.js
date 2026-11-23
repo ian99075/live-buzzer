@@ -1,39 +1,64 @@
-import { exportPlan } from './sheets.js';
+const identity = s => ({ id: s.id, studentNumber: s.studentNumber, groupNumber: s.groupNumber,
+  ...(s.answers ? { answers: { ...s.answers } } : { answer: s.answer }) });
 
-const identity = s => ({ id: s.id, studentNumber: s.studentNumber, groupNumber: s.groupNumber, answer: s.answer });
-export function teacherQuestion(q, store) {
-  const ranking = store.ranking(q), ranked = new Map(ranking.map(entry => [entry.id, entry]));
-  const submissions = [...q.submissions.values()].map(s => {
-    const entry = ranked.get(s.id), frozen = q.finalRanking?.find(item => item.id === s.id);
+function competitionProjection(entity, store) {
+  const ranking = store.ranking(entity), ranked = new Map(ranking.map(entry => [entry.id, entry]));
+  const submissions = [...entity.submissions.values()].map(s => {
+    const entry = ranked.get(s.id), frozen = entity.finalRanking?.find(item => item.id === s.id);
     return { ...identity(s), acceptedAt: s.acceptedAt, acceptedOrder: s.acceptedOrder,
-      priorWinCount: entry?.priorWinCount ?? frozen?.priorWinCount ?? store.priorWins(s.groupNumber, q.id),
+      priorWinCount: entry?.priorWinCount ?? frozen?.priorWinCount ?? store.priorWins(s.groupNumber, entity.id),
       rank: entry?.rank ?? null, disqualified: s.disqualified };
   });
-  const first = ranking[0] ? store.submissionById(q, ranking[0].id) : null;
-  const caseRecord = store.caseIndex.get(q.caseNumber);
-  return { id: q.id, caseNumber: q.caseNumber, partNumber: q.partNumber,
-    groupId: caseRecord?.kind === 'group' ? caseRecord.id : null,
-    groupTitle: caseRecord?.title ?? null,
-    content: q.content, durationSeconds: q.durationSeconds,
-    status: q.status, deadlineAt: q.status === 'open' ? q.deadlineAt : null,
-    remainingMs: q.status === 'paused' || q.status === 'draft' ? q.remainingMs : q.status === 'settled' ? 0 : null,
-    submissions, provisionalLeader: q.status === 'settled' || !first ? null : identity(first),
-    winner: q.status !== 'settled' || q.winnerKey === null ? null : identity(q.submissions.get(q.winnerKey)),
-    clearPending: q.status === 'settled' && q.confirmedExport && q.winnerKey === null };
+  const first = ranking[0] ? store.submissionById(entity, ranking[0].id) : null;
+  return { durationSeconds: entity.durationSeconds, status: entity.status,
+    deadlineAt: entity.status === 'open' ? entity.deadlineAt : null,
+    remainingMs: ['paused', 'draft'].includes(entity.status) ? entity.remainingMs : entity.status === 'settled' ? 0 : null,
+    submissions, provisionalLeader: entity.status === 'settled' || !first ? null : identity(first),
+    winner: entity.status !== 'settled' || entity.winnerKey === null ? null : identity(entity.submissions.get(entity.winnerKey)) };
 }
+
+export function teacherQuestion(q, store) {
+  const result = competitionProjection(q, store);
+  return { id: q.id, kind: 'single', caseNumber: q.caseNumber, partNumber: null,
+    groupId: null, groupTitle: null, content: q.content, sourceKey: q.sourceKey ?? null,
+    ...result, clearPending: q.status === 'settled' && q.confirmedExport && q.winnerKey === null };
+}
+
+export function teacherGroup(group, store) {
+  const parts = group.questionIds.map(id => store.get(id));
+  return { id: group.id, groupId: group.id, kind: 'group', caseNumber: group.caseNumber,
+    groupTitle: group.title, title: group.title,
+    parts: parts.map(part => ({ id: part.id, sourceKey: part.sourceKey, partNumber: part.partNumber, content: part.content })),
+    ...competitionProjection(group, store),
+    clearPending: parts.some(part => part.confirmedExport) && group.winnerKey === null };
+}
+
 export function teacherSnapshot(store, config) {
-  return { serverNow: store.wallClock(), questions: store.all().map(q => teacherQuestion(q, store)),
-    exporting: store.exporting, sheetName: config.sheetName, testMode: config.testMode === true,
-    exportPlan: exportPlan(store, config.sheetName) };
+  return { serverNow: store.wallClock(), questions: store.competitions().map(entity =>
+    entity.kind === 'group' ? teacherGroup(entity, store) : teacherQuestion(entity, store)),
+    exporting: store.exporting, sheetName: config.sheetName, testMode: config.testMode === true };
 }
+
+function studentCompetition(entity, studentNumber) {
+  return { status: entity.status,
+    deadlineAt: entity.status === 'open' ? entity.deadlineAt : null,
+    remainingMs: entity.status === 'paused' ? entity.remainingMs : entity.status === 'settled' ? 0 : null,
+    submitted: entity.submissions.has(studentNumber),
+    ...(entity.status === 'settled' ? { firstPlace: entity.winnerKey === null ? null : {
+      studentNumber: entity.submissions.get(entity.winnerKey).studentNumber,
+      groupNumber: entity.submissions.get(entity.winnerKey).groupNumber,
+    } } : {}) };
+}
+
 export function studentSnapshot(store, studentNumber, groupNumber) {
   return { studentNumber, groupNumber, serverNow: store.wallClock(),
-    questions: store.all().filter(q => q.status === 'open' || q.status === 'paused').map(q => ({
-    id: q.id, caseNumber: q.caseNumber, partNumber: q.partNumber,
-    groupTitle: store.caseIndex.get(q.caseNumber)?.title ?? null,
-    content: q.content, status: q.status,
-    deadlineAt: q.status === 'open' ? q.deadlineAt : null,
-    remainingMs: q.status === 'paused' ? q.remainingMs : null,
-    submitted: q.submissions.has(studentNumber),
-  })) };
+    questions: store.competitions().filter(entity => entity.status !== 'draft').map(entity =>
+      entity.kind === 'group' ? {
+        id: entity.id, groupId: entity.id, kind: 'group', caseNumber: entity.caseNumber, groupTitle: entity.title,
+        parts: entity.questionIds.map(id => { const part = store.get(id); return {
+          id: part.id, sourceKey: part.sourceKey, partNumber: part.partNumber, content: part.content }; }),
+        ...studentCompetition(entity, studentNumber),
+      } : { id: entity.id, kind: 'single', caseNumber: entity.caseNumber,
+        partNumber: null, groupTitle: null, content: entity.content,
+        ...studentCompetition(entity, studentNumber) }) };
 }

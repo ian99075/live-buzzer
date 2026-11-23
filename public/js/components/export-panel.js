@@ -3,53 +3,52 @@ import { api, element, message } from '../api.js';
 export function exportPanel({ lock, refresh, failed }) {
   const $ = selector => document.querySelector(selector);
   const button = $('#export-button'), feedback = $('#export-message'), dialog = $('#export-dialog');
-  let busy = false, remoteLock = false, generation = 0, snapshot = { questions: [] };
+  let busy = false, remoteLock = false, generation = 0, preview = null, testMode = false;
   function render() {
     button.disabled = busy || remoteLock;
-    button.textContent = busy || remoteLock ? '彙整中，請稍候…' : '彙整至 Google Sheet ↗';
-    $('#confirm-export').disabled = busy || remoteLock || !snapshot.exportPlan?.items.length;
+    button.textContent = busy || remoteLock ? '讀取中，請稍候…' : '彙整至 Google Sheet ↗';
+    $('#confirm-export').disabled = busy || remoteLock || !preview?.items.length;
   }
   function renderList() {
     const list = $('#export-items'); list.replaceChildren();
-    for (const itemPlan of snapshot.exportPlan?.items || []) {
+    for (const plan of preview?.items || []) {
       const item = element('div', 'export-item');
-      item.append(element('small', '', `CASE ${itemPlan.caseNumber}${itemPlan.partNumber ? `-${itemPlan.partNumber}` : ''} → ${itemPlan.range}`),
-        element('p', '', itemPlan.clear ? '清空舊值' : itemPlan.value)); list.append(item);
+      item.append(element('small', '', `題目 ${plan.key.replace('_', '-')} → ${plan.range}`),
+        element('p', '', plan.clear ? '清空舊值' : plan.value)); list.append(item);
     }
     if (!list.children.length) list.append(element('p','muted','目前沒有可匯出的回答。'));
-    $('#confirm-export').textContent = snapshot.testMode ? '確認模擬匯出' : '確認匯出';
+    $('#confirm-export').textContent = testMode ? '確認模擬匯出' : '確認匯出';
   }
-  button.onclick = () => {
+  button.onclick = async () => {
     if (busy || remoteLock) return;
-    if (!snapshot.exportPlan?.items.length) { message(feedback,'目前沒有可匯出或清空的格，未寫入任何儲存格。'); return; }
-    renderList(); render(); dialog.showModal();
+    preview = null; busy = true; lock(true); render(); message(feedback, '正在讀取 Google Sheet 現況…');
+    try {
+      preview = await api('/api/teacher/exports/google-sheet/preview');
+      $('#sheet-target').textContent = `${preview.sheetName} · 請核對格位與內容`;
+      renderList(); message(feedback); dialog.showModal();
+    } catch (error) { message(feedback, error.message, true); failed(error); }
+    finally { busy = false; lock(false); render(); }
   };
   $('#close-export').onclick = $('#cancel-export').onclick = () => dialog.close();
   $('#confirm-export').onclick = async () => {
-    if (busy || remoteLock || !snapshot.exportPlan?.items.length) return;
-    const current = generation;
-    dialog.close(); busy = true; lock(true); render(); message(feedback,'正在彙整已結算題目…');
+    if (busy || remoteLock || !preview?.items.length) return;
+    const current = generation, token = preview.token;
+    dialog.close(); preview = null; busy = true; lock(true); render(); message(feedback,'正在寫入並讀回答案格…');
     try {
-      const result = await api('/api/teacher/exports/google-sheet', { method: 'POST' });
+      const result = await api('/api/teacher/exports/google-sheet', { method: 'POST', body: { token } });
       if (current !== generation) return;
-      message(feedback, result.writtenCount === 0 ? '目前沒有可匯出的回答，未寫入任何儲存格。'
-        : `${result.testMode ? '模擬完成（未寫入 Google）' : '已完成寫入'}：${result.writtenCount} 格，其中清空 ${result.clearedCount} 格。\n${result.ranges.join('、')}`);
+      message(feedback, `${result.testMode ? '模擬完成' : '已完成寫入'}：${result.writtenCount} 格，其中清空 ${result.clearedCount} 格。\n${result.ranges.join('、')}`);
     } catch (error) {
       if (current !== generation) return;
-      message(feedback,error.message,true); failed(error);
+      message(feedback, error.status === 409 ? `${error.message} 請重新開啟匯出預覽。` : error.message, true);
+      failed(error);
     } finally {
       if (current === generation) { busy = false; lock(false); render(); await refresh(); }
     }
   };
   return {
-    update(value) {
-      snapshot = value; remoteLock = value.exporting;
-      $('#sheet-target').textContent = `${value.sheetName} · 按 Case／小題對應 Sequence${value.exportPlan.throughCase >= 7 ? ` · Case 7–${value.exportPlan.throughCase} 若尚無列將首次新增` : ''}${value.testMode ? ' · 模擬匯出，不會寫入 Google' : ''}`;
-      if (dialog.open) renderList(); render();
-    },
-    reset() {
-      generation++; busy = false; remoteLock = false; snapshot = {questions:[]};
-      dialog.close(); $('#export-items').replaceChildren(); message(feedback); lock(false); render();
-    },
+    update(value) { remoteLock = value.exporting; testMode = value.testMode; render(); },
+    reset() { generation++; busy = false; remoteLock = false; preview = null; dialog.close();
+      $('#export-items').replaceChildren(); message(feedback); lock(false); render(); },
   };
 }

@@ -1,18 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture, stream } from './helpers.js';
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 test('教師計時控制、學生暫停投影、狀態衝突與權限', async t => {
   const f = await fixture(t); const teacher = await f.login('teacher'); const student = await f.login('student', '00123');
-  const created = await f.request('/api/teacher/questions', { method: 'POST', cookie: teacher,
-    body: { content: '題目', durationSeconds: 30 } });
-  assert.equal(created.status, 201); const id = created.data.id;
-  assert.equal(created.data.durationSeconds, 30);
+  f.sheet.put('C5', '題目', '$q_1$'); f.sheet.put('H5', '$a_1$');
+  await f.request('/api/teacher/questions/import-google-sheet', { method:'POST', cookie:teacher });
+  const id = (await f.request('/api/teacher/questions', { cookie:teacher })).data.questions[0].id;
+  assert.equal((await f.request(`/api/teacher/questions/${id}`, { method:'PATCH', cookie:teacher,
+    body:{durationSeconds:30} })).data.durationSeconds, 30);
   assert.equal((await f.request(`/api/teacher/questions/${id}/pause`, { method: 'POST', cookie: teacher })).status, 409);
   assert.equal((await f.request(`/api/teacher/questions/${id}/start`, { method: 'POST', cookie: teacher })).status, 200);
   assert.equal((await f.request(`/api/teacher/questions/${id}`, { method: 'PATCH', cookie: teacher,
-    body: { content: '題目', durationSeconds: 60 } })).status, 409);
+    body: { durationSeconds: 60 } })).status, 409);
   const paused = await f.request(`/api/teacher/questions/${id}/pause`, { method: 'POST', cookie: teacher });
   assert.equal(paused.data.status, 'paused'); assert.ok(paused.data.remainingMs > 0);
   const own = (await f.request('/api/student/questions', { cookie: student })).data;
@@ -21,7 +21,8 @@ test('教師計時控制、學生暫停投影、狀態衝突與權限', async t 
   assert.equal((await f.request(`/api/teacher/questions/${id}/resume`, { method: 'POST', cookie: student })).status, 401);
   assert.equal((await f.request(`/api/teacher/questions/${id}/resume`, { method: 'POST', cookie: teacher })).data.status, 'open');
   assert.equal((await f.request(`/api/teacher/questions/${id}/stop`, { method: 'POST', cookie: teacher })).data.status, 'settled');
-  assert.deepEqual((await f.request('/api/student/questions', { cookie: student })).data.questions, []);
+  const settled = (await f.request('/api/student/questions', { cookie: student })).data.questions[0];
+  assert.equal(settled.status, 'settled'); assert.equal(settled.firstPlace, null);
   assert.equal((await f.request(`/api/teacher/questions/${id}/start`, { method: 'POST', cookie: teacher })).status, 409);
 });
 
@@ -43,7 +44,9 @@ test('教師即時排名與失格遞補，學生白名單及事件不洩漏', as
   assert.deepEqual(view.submissions.map(s => s.priorWinCount), [1, 0]);
   const own = (await f.request('/api/student/questions', { cookie: b })).data;
   assert.deepEqual(Object.keys(own).sort(), ['groupNumber', 'questions', 'serverNow', 'studentNumber']);
-  assert.deepEqual(Object.keys(own.questions[0]).sort(), ['caseNumber', 'content', 'deadlineAt', 'groupTitle', 'id', 'partNumber', 'remainingMs', 'status', 'submitted']);
+  const open = own.questions.find(q => q.id === q2.id);
+  assert.deepEqual(Object.keys(open).sort(), ['caseNumber', 'content', 'deadlineAt', 'groupTitle', 'id', 'kind', 'partNumber', 'remainingMs', 'status', 'submitted']);
+  assert.deepEqual(own.questions.find(q => q.id === q1.id).firstPlace, { studentNumber: '甲', groupNumber: 1 });
   assert.equal(JSON.stringify(own).includes('甲答'), false);
   await f.request(`/api/teacher/questions/${q2.id}/stop`, { method: 'POST', cookie: teacher });
   view = (await f.request(`/api/teacher/questions/${q2.id}`, { cookie: teacher })).data;
@@ -64,7 +67,7 @@ test('教師即時排名與失格遞補，學生白名單及事件不洩漏', as
   assert.ok(events.every(event => !event.includes('winner') && !event.includes('rank') && !event.includes('甲答')));
 });
 
-test('僅教師順位改變時不推播不相關的學生事件', async t => {
+test('已公開的第一名失格時推播更新，其他開放題仍不洩漏順位', async t => {
   const f = await fixture(t); const teacher = await f.login('teacher');
   const a = await f.login('student', '甲'), b = await f.login('student', '乙');
   const q1 = await f.question(teacher, 1), q2 = await f.question(teacher, 2);
@@ -75,8 +78,11 @@ test('僅教師順位改變時不推播不相關的學生事件', async t => {
   await publicStream.next();
   const submissionId = f.store.get(q1.id).submissions.get('甲').id;
   await f.request(`/api/teacher/questions/${q1.id}/submissions/${submissionId}/disqualify`, { method: 'POST', cookie: teacher });
-  await delay(40);
-  assert.equal(publicStream.frames.length, 0);
+  const update = await publicStream.next();
+  assert.equal(update.data.questions.find(q => q.id === q1.id).firstPlace, null);
+  assert.equal(Object.hasOwn(update.data.questions.find(q => q.id === q2.id), 'firstPlace'), false);
+  assert.equal(update.raw.includes('甲先前'), false);
+  assert.equal(update.raw.includes('rank'), false);
   const view = (await f.request(`/api/teacher/questions/${q2.id}`, { cookie: teacher })).data;
   assert.equal(view.provisionalLeader.studentNumber, '乙');
 });
